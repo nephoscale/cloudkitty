@@ -21,8 +21,10 @@ from oslo_config import cfg
 import six
 from stevedore import driver
 
-from cloudkitty import collector as ck_collector
 from cloudkitty import utils as ck_utils
+
+STORAGES_NAMESPACE = 'cloudkitty.storage.backends'
+CONF = cfg.CONF
 
 storage_opts = [
     cfg.StrOpt('backend',
@@ -30,16 +32,12 @@ storage_opts = [
                help='Name of the storage backend driver.')
 ]
 
-CONF = cfg.CONF
 CONF.register_opts(storage_opts, group='storage')
+CONF.import_opt('period', 'cloudkitty.collector', 'collect')
 
-STORAGES_NAMESPACE = 'cloudkitty.storage.backends'
 
-
-def get_storage(collector=None):
-    storage_args = {
-        'period': CONF.collect.period,
-        'collector': collector if collector else ck_collector.get_collector()}
+def get_storage():
+    storage_args = {'period': cfg.CONF.collect.period}
     backend = driver.DriverManager(
         STORAGES_NAMESPACE,
         cfg.CONF.storage.backend,
@@ -62,9 +60,8 @@ class BaseStorage(object):
 
         Handle incoming data from the global orchestrator, and store them.
     """
-    def __init__(self, **kwargs):
-        self._period = kwargs.get('period', CONF.collect.period)
-        self._collector = kwargs.get('collector')
+    def __init__(self, period=CONF.collect.period):
+        self._period = period
 
         # State vars
         self.usage_start = {}
@@ -177,8 +174,10 @@ class BaseStorage(object):
         :param tenant_id: tenant_id to filter on.
         """
 
+    # Modified by Muralidharan.s for applying a logic for getting 
+    # Total value based on Instance
     @abc.abstractmethod
-    def get_total(self, begin=None, end=None, tenant_id=None, service=None):
+    def get_total(self, begin=None, end=None, tenant_id=None, service=None, instance_id=None):
         """Return the current total.
 
         :param begin: When to start filtering.
@@ -189,6 +188,122 @@ class BaseStorage(object):
         :type res_type: str
         :param service: Filter on the resource type.
         :type service: str
+        :param service: Filter on the instance_id.
+        :type service: str
+        """
+
+    # Get invoice for admin tenant
+    @abc.abstractmethod
+    def get_invoice(self, tenant_id=None, invoice_id= None, payment_status=None):
+        """Return the invoice.
+
+        :param tenant_id: Filter on the tenant_id.
+        :type res_type: str
+        :param invoice_id: Filter on the invoice_id.
+        :type res_type: str
+        :param payment_status: Filter on the payment_status.
+        :type res_type: str
+        """
+
+    # Get Invoice for non-admin tenant
+    @abc.abstractmethod
+    def get_invoice_for_tenant(self, tenant_name, invoice_id= None, payment_status=None):
+        """Return the invoice.
+
+        :param tenant_name: Filter on the tenant_name.
+        :type res_type: str
+        :param invoice_id: Filter on the invoice_id.
+        :type res_type: str
+        :param payment_status: Filter on the payment_status.
+        :type res_type: str
+        """
+
+    # Invoice list for admin and non-admin
+    @abc.abstractmethod
+    def list_invoice(self, tenant_name, all_tenants=None):
+        """Return the invoice list.
+
+        :param tenant_name: Filter on the tenant_name.
+        :type res_type: str
+        :param all_tenants: param for getting all tenant details
+        :type res_type: str
+        """
+
+
+    # Invoice show for non-admin
+    @abc.abstractmethod
+    def show_invoice_for_tenant(self, tenant_name, invoice_id):
+        """Show the invoice for tenant.
+
+        :param tenant_name: Filter on the tenant_name.
+        :type res_type: str
+        :param invoice_id: param for getting invoice id
+        :type res_type: str
+        """
+
+    # Invoice show for admin
+    @abc.abstractmethod
+    def show_invoice(self, invoice_id):
+        """Show the invoice for admin.
+
+        :param invoice_id: param for getting invoice id
+        :type res_type: str
+        """
+
+    # Add invoice method
+    @abc.abstractmethod
+    def add_invoice(self, invoice_id, invoice_date, invoice_period_from, invoice_period_to, tenant_id, invoice_data, tenant_name, total_cost, paid_cost, balance_cost, payment_status):
+        """Add the invoice.
+
+        :param invoice_id: invoice_id values
+        :type res_type: str
+        :param invoice_date: invoice_date values
+        :type res_type: str
+        :param invoice_period_from: invoice start date
+        :type res_type: str
+        :param invoice_period_to: invoice end date
+        :type res_type: str
+        :param tenant_id: tenant_id values
+        :type res_type: str
+        :param invoice_data: invoice date cost details and itemized details
+        :type res_type: str
+        :param tenant_name: tenant name details
+        :type res_type: str
+        :param total_cost: total cost detail 
+        :type res_type: str
+        :param paid_cost: paid_cost detail
+        :type res_type: str
+        :param balance_cost: balance cost
+        :type res_type: str
+        :param payment_status: payment status of invoice
+        :type res_type: str
+        """
+
+
+    # Update invoice method
+    @abc.abstractmethod
+    def update_invoice(self, invoice_id=None, total_cost=None, paid_cost=None, balance_cost=None, payment_status=None):
+        """Update the invoice.
+
+        :param invoice_id: invoice_id values
+        :type res_type: str
+        :param total_cost: total cost detail 
+        :type res_type: str
+        :param paid_cost: paid_cost detail
+        :type res_type: str
+        :param balance_cost: balance cost
+        :type res_type: str
+        :param payment_status: payment status of invoice
+        :type res_typ
+        """
+
+    # delete invoice method
+    @abc.abstractmethod
+    def delete_invoice(self, invoice_id=None):
+        """Delete the invoice.
+
+        :param invoice_id: invoice_id values
+        :type res_type: str
         """
 
     @abc.abstractmethod

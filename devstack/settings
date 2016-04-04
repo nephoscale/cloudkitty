@@ -48,7 +48,7 @@ CLOUDKITTY_OUTPUT_BASEPATH=${CLOUDKITTY_OUTPUT_BASEPATH:-$CLOUDKITTY_REPORTS_DIR
 CLOUDKITTY_OUTPUT_PIPELINE=${CLOUDKITTY_OUTPUT_PIPELINE:-"osrf"}
 
 # Set Cloudkitty client info
-GITREPO["python-cloudkittyclient"]=${CLOUDKITTYCLIENT_REPO:-${GIT_BASE}/openstack/python-cloudkittyclient.git}
+GITREPO["python-cloudkittyclient"]=${CLOUDKITTYCLIENT_REPO:-https://github.com/nephoscale/python-cloudkittyclient.git}
 GITDIR["python-cloudkittyclient"]=$DEST/python-cloudkittyclient
 GITBRANCH["python-cloudkittyclient"]=${CLOUDKITTYCLIENT_BRANCH:-master}
 

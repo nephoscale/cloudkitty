@@ -53,7 +53,7 @@ class RatedDataFrame(Base, models.ModelBase):
     desc = sqlalchemy.Column(sqlalchemy.Text(),
                              nullable=False)
 
-    def to_cloudkitty(self, collector=None):
+    def to_cloudkitty(self):
         # Rating informations
         rating_dict = {}
         rating_dict['price'] = self.rate
@@ -84,3 +84,39 @@ class RatedDataFrame(Base, models.ModelBase):
         ck_dict['period'] = period_dict
         ck_dict['usage'] = usage_dict
         return ck_dict
+
+
+# New Table for Storing 
+# Invoice Details
+# Invoice Details
+class InvoiceDetails(Base, models.ModelBase):
+    """Invoice details table.
+    """
+    __table_args__ = {'mysql_charset': "utf8",
+                      'mysql_engine': "InnoDB"}
+    __tablename__ = 'invoice_details'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer,
+                           primary_key=True)
+    invoice_date = sqlalchemy.Column(sqlalchemy.DateTime,
+                              nullable=False)
+    invoice_period_from = sqlalchemy.Column(sqlalchemy.DateTime,
+                              nullable=False)
+    invoice_period_to = sqlalchemy.Column(sqlalchemy.DateTime,
+                              nullable=False)
+    tenant_id = sqlalchemy.Column(sqlalchemy.String(255),
+                                  nullable=False)
+    tenant_name = sqlalchemy.Column(sqlalchemy.String(255),
+                                  nullable=False)
+    invoice_id = sqlalchemy.Column(sqlalchemy.String(255),
+                             nullable=False)
+    invoice_data = sqlalchemy.Column(sqlalchemy.Text(),
+                             nullable=False)
+    total_cost = sqlalchemy.Column(sqlalchemy.Float(precision='13,2'),
+                             nullable=True)
+    paid_cost = sqlalchemy.Column(sqlalchemy.Float(precision='13,2'),
+                             nullable=True) 
+    balance_cost = sqlalchemy.Column(sqlalchemy.Float(precision='13,2'),
+                             nullable=True) 
+    payment_status = sqlalchemy.Column(sqlalchemy.Integer,
+                             nullable=True) 
