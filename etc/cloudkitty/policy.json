@@ -9,6 +9,12 @@
 
     "report:list_tenants": "role:admin",
     "report:get_total": "",
+    "report:invoice": "",
+    "report:list_invoice": "",
+    "report:show_invoice": "role:admin",
+    "report:add_invoice": "role:admin",
+    "report:update_invoice": "role:admin",
+    "report:delete_invoice": "role:admin",
 
     "collector:list_mappings": "role:admin",
     "collector:get_mapping": "role:admin",

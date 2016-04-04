@@ -17,14 +17,13 @@
 #
 import datetime
 import decimal
-
+import six
 import pecan
 from pecan import rest
 from wsme import types as wtypes
 import wsmeext.pecan as wsme_pecan
 
 from cloudkitty.common import policy
-
 
 class ReportController(rest.RestController):
     """REST Controller managing the reporting.
@@ -33,7 +32,13 @@ class ReportController(rest.RestController):
 
     _custom_actions = {
         'total': ['GET'],
-        'tenants': ['GET']
+        'tenants': ['GET'],
+        'invoice': ['GET'],
+        'list_invoice': ['GET'],
+        'add_invoice': ['POST'],
+        'update_invoice': ['PUT'],
+        'show_invoice': ['GET'],
+        'delete_invoice': ['DELETE'],
     }
 
     @wsme_pecan.wsexpose([wtypes.text],
@@ -52,8 +57,12 @@ class ReportController(rest.RestController):
                          datetime.datetime,
                          datetime.datetime,
                          wtypes.text,
+                         wtypes.text,
                          wtypes.text)
-    def total(self, begin=None, end=None, tenant_id=None, service=None):
+
+    # Modified by Muralidharan.s for applying a logic for getting 
+    # Total value based on Instance
+    def total(self, begin=None, end=None, tenant_id=None, service=None, instance_id=None):
         """Return the amount to pay for a given period.
 
         """
@@ -62,5 +71,216 @@ class ReportController(rest.RestController):
         # FIXME(sheeprine): We should filter on user id.
         # Use keystone token information by default but make it overridable and
         # enforce it by policy engine
-        total = storage.get_total(begin, end, tenant_id, service)
+        total = storage.get_total(begin, end, tenant_id, service, instance_id)
         return total if total else decimal.Decimal('0')
+
+    # For getting the invoice for admin and non-admin tenants
+    # Can get the invoice based on invoice-id , tenant-id and payment-status
+    @wsme_pecan.wsexpose(decimal.Decimal,
+                         wtypes.text,
+                         wtypes.text,
+                         wtypes.text)
+    def invoice(self, tenant_id=None, invoice_id=None, payment_status=None):
+        """Return the Invoice details.
+
+        """
+        policy.enforce(pecan.request.context, 'report:invoice', {})
+        storage = pecan.request.storage_backend
+
+        # role of tenant
+        roles = pecan.request.context.__dict__['roles']
+
+        # fetch tenant name
+        tenant_name = pecan.request.context.__dict__['tenant']
+
+        # If tenant_id or invoice_id or payment_status exists
+        if tenant_id or invoice_id or payment_status:
+
+                # if admin role
+                if 'admin' in roles:
+
+                        invoice = storage.get_invoice(tenant_id, invoice_id, payment_status)
+
+                # for non-admin roles
+                else:
+
+                        # for avoiding tenant_id arg for non-admin
+                        if not tenant_id:
+
+                                invoice = storage.get_invoice_for_tenant(tenant_name, invoice_id, payment_status)
+
+                        # for generating a warning message if tenant_id arg passed for non-admin
+                        else:
+
+                                pecan.abort(405, six.text_type())
+
+        # for generating the warning message that invoice-get not supported
+        else:
+
+                pecan.abort(405, six.text_type())
+
+
+        return invoice if invoice else "No Invoice found"
+
+    # For invoice-list 
+    # Generate invoice-list results
+    # admin and non-admin tenant can be able to get the result 
+    # Only admin tenant can be able to use all-tenants arg
+    @wsme_pecan.wsexpose(decimal.Decimal,
+                         wtypes.text)
+    def list_invoice(self, all_tenants=None):
+        """Return the Invoice details.
+
+        """
+        policy.enforce(pecan.request.context, 'report:list_invoice', {})
+        storage = pecan.request.storage_backend
+        # Fetch the user role
+        roles = pecan.request.context.__dict__['roles']
+
+        # fetch tenant name
+        tenant_name = pecan.request.context.__dict__['tenant']
+
+        # for admin tenant
+        if 'admin' in roles:
+                invoice = storage.list_invoice(tenant_name, all_tenants)
+
+        # For producing result for non-admin tenant if all-tenants arg not used
+        elif 'admin' not in roles and all_tenants is None:
+                invoice = storage.list_invoice(tenant_name, all_tenants)
+
+        # For non-admin tenant to restrict the use of all-tenants arg
+        elif 'admin' not in roles and all_tenants is not None:
+                pecan.abort(403, six.text_type())
+
+        return invoice if invoice else "No Invoice found"
+
+
+    # For invoice-show 
+    # Generate invoice-show results
+    # admin and non-admin tenant can be able to get the result
+    # Will show the full details of invoice  
+    @wsme_pecan.wsexpose(decimal.Decimal,
+                         wtypes.text)
+    def show_invoice(self, invoice_id):
+        """Return the Invoice details.
+
+        """
+        policy.enforce(pecan.request.context, 'report:show_invoice', {})
+        storage = pecan.request.storage_backend
+
+        # Fetch the user role
+        roles = pecan.request.context.__dict__['roles']
+
+        # fetch tenant name
+        tenant_name = pecan.request.context.__dict__['tenant']
+
+        # for admin tenant
+        if 'admin' in roles:
+                invoice = storage.show_invoice(invoice_id)
+
+        # For producing result for non-admin tenant
+        elif 'admin' not in roles:
+                invoice = storage.show_invoice_for_tenant(tenant_name, invoice_id)
+
+        return invoice if invoice else "No Invoice found"
+
+    # adding the invoice
+    @wsme_pecan.wsexpose(decimal.Decimal,
+                         wtypes.text,
+                         wtypes.text,
+                         wtypes.text,
+                         wtypes.text,
+                         wtypes.text,
+                         wtypes.text,
+                         wtypes.text,
+                         wtypes.text,
+                         wtypes.text,
+                         wtypes.text,
+                         wtypes.text)
+    def add_invoice(self, invoice_id, invoice_date, invoice_period_from, invoice_period_to, tenant_id, invoice_data, tenant_name, total_cost, paid_cost, balance_cost, payment_status ):
+        """Add the Invoice details.
+        """
+
+        try:
+            policy.enforce(pecan.request.context, 'report:add_invoice', {})
+        except policy.PolicyNotAuthorized as e:
+            pecan.abort(403, six.text_type(e))
+
+        storage = pecan.request.storage_backend
+
+        # Fetch the user role
+        roles = pecan.request.context.__dict__['roles']
+
+        # for admin tenant
+        if 'admin' in roles:
+
+                # invoice details
+                invoice = storage.add_invoice(invoice_id, 
+                                              invoice_date, 
+                                              invoice_period_from, 
+                                              invoice_period_to, 
+                                              tenant_id, 
+                                              invoice_data, 
+                                              tenant_name, 
+                                              total_cost, 
+                                              paid_cost, 
+                                              balance_cost, 
+                                              payment_status)
+
+    # Updating the invoice
+    @wsme_pecan.wsexpose(decimal.Decimal,
+                         wtypes.text,
+                         wtypes.text,
+                         wtypes.text,
+                         wtypes.text,
+                         wtypes.text)
+    def update_invoice(self, invoice_id, total_cost=None, paid_cost=None, balance_cost=None, payment_status=None ):
+        """
+        update the invoice details
+        """
+
+        try:
+            policy.enforce(pecan.request.context, 'report:update_invoice', {})
+        except policy.PolicyNotAuthorized as e:
+            pecan.abort(403, six.text_type(e))
+
+        storage = pecan.request.storage_backend
+
+        # Fetch the user role
+        roles = pecan.request.context.__dict__['roles']
+
+        # for admin tenant
+        if 'admin' in roles:
+
+                # invoice details
+                invoice = storage.update_invoice(invoice_id,
+                                              total_cost,
+                                              paid_cost,
+                                              balance_cost,
+                                              payment_status)
+
+        return invoice
+
+    # Delete the Invoice
+    @wsme_pecan.wsexpose(decimal.Decimal,
+                         wtypes.text)
+    def delete_invoice(self, invoice_id):
+        """
+        delete the invoice
+        """
+
+        try:
+            policy.enforce(pecan.request.context, 'report:delete_invoice', {})
+        except policy.PolicyNotAuthorized as e:
+            pecan.abort(403, six.text_type(e))
+
+        storage = pecan.request.storage_backend
+
+        # Fetch the user role
+        roles = pecan.request.context.__dict__['roles']
+
+        # for admin tenant
+        if 'admin' in roles:
+
+                # invoice details
+                invoice = storage.delete_invoice(invoice_id)
