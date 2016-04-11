@@ -317,3 +317,40 @@ class CeilometerCollector(collector.BaseCollector):
                                             'network.floating')
         return self.t_cloudkitty.format_service('network.floating',
                                                 floating_data)
+
+    def get_cloudstorage(self, start, end=None, project_id=None, q_filter=None):
+
+        active_cloud_volume_stats = self.resources_stats('storage.objects.incoming.bytes',
+                                                   start,
+                                                   end,
+                                                   project_id,
+                                                   q_filter)
+
+        cloud_volume_data = []
+
+        for cloud_volume_stats in active_cloud_volume_stats:
+
+            cloud_volume_id = cloud_volume_stats.groupby['resource_id']
+            if not self._cacher.has_resource_detail('cloudstorage',
+                                                    cloud_volume_id):
+                raw_resource = self._conn.resources.get(cloud_volume_id)
+
+                cloud_volume = self.t_ceilometer.strip_resource_data('cloudstorage',
+                                                               raw_resource)
+
+                self._cacher.add_resource_detail('cloudstorage',
+                                                 cloud_volume_id,
+                                                 cloud_volume)
+
+            cloud_volume = self._cacher.get_resource_detail('cloudstorage',
+                                                      cloud_volume_id)
+
+            cloud_volume_gb = cloud_volume_stats.max / 1048576.0
+
+            cloud_volume_data.append(self.t_cloudkitty.format_item(cloud_volume,
+                                                             'B',
+                                                             cloud_volume_gb))
+
+        if not cloud_volume_data:
+            raise collector.NoDataCollected(self.collector_name, 'cloudstorage')
+        return self.t_cloudkitty.format_service('cloudstorage', cloud_volume_data)
