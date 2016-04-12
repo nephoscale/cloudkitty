@@ -47,8 +47,10 @@ class SQLAlchemyStorage(storage.BaseStorage):
     """SQLAlchemy Storage Backend
 
     """
-    def __init__(self, period=3600):
-        super(SQLAlchemyStorage, self).__init__(period)
+    frame_model = models.RatedDataFrame
+
+    def __init__(self, **kwargs):
+        super(SQLAlchemyStorage, self).__init__(**kwargs)
         self._session = {}
 
     @staticmethod
@@ -98,7 +100,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
         if r:
             return ck_utils.dt2ts(r.begin)
 
-    # Modified by Muralidharan.s for applying a logic for getting 
+    # Modified by Muralidharan.s for applying a logic for getting
     # Total value based on Instance
     def get_total(self, begin=None, end=None, tenant_id=None, service=None, instance_id=None):
         model = models.RatedDataFrame
@@ -153,7 +155,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
         # For getting the values from SQL object
         for m in r:
 
-                # create a dict with values 
+                # create a dict with values
                 g = m.__dict__
 
                 # Eliminate the Alchemy object
@@ -165,14 +167,14 @@ class SQLAlchemyStorage(storage.BaseStorage):
                 # Key value pair for tenant_id and invoice_details
                 n[tenant_id].append(g)
 
-        # json dumps for converting a dict to json 
+        # json dumps for converting a dict to json
         n = json.dumps(n, default=json_util.default, use_decimal=True)
 
         return n
 
     # For getting a invoice details as needed
     # admin tenant section
-    # can use invoice-id, payment_status and tenant-id arguments 
+    # can use invoice-id, payment_status and tenant-id arguments
     def get_invoice(self, tenant_id=None, invoice_id=None, payment_status=None):
 
         model = models.InvoiceDetails
@@ -200,7 +202,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
         # For getting the values from SQL object
         for m in r:
 
-                # create a dict with values 
+                # create a dict with values
                 g = m.__dict__
 
                 # Eliminate the Alchemy object
@@ -212,7 +214,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
                 # Key value pair for tenant_id and invoice_details
                 n[tenant_id].append(g)
 
-        # json dumps for converting a dict to json 
+        # json dumps for converting a dict to json
         n = json.dumps(n, default=json_util.default, use_decimal=True)
 
         return n
@@ -242,7 +244,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
         # For getting the values from SQL object
         for m in r:
 
-                # create a dict with values 
+                # create a dict with values
                 g = m.__dict__
 
                 # Eliminate the Alchemy object
@@ -254,7 +256,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
                 # Key value pair for tenant_id and invoice_details
                 n[tenant_id].append(g)
 
-        # json dumps for converting a dict to json 
+        # json dumps for converting a dict to json
         n = json.dumps(n, default=json_util.default, use_decimal=True)
 
         return n
@@ -280,7 +282,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
         # For getting the values from SQL object
         for m in r:
 
-                # create a dict with values 
+                # create a dict with values
                 g = m.__dict__
 
                 # Eliminate the Alchemy object
@@ -292,7 +294,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
                 # Key value pair for tenant_id and invoice_details
                 n[tenant_id].append(g)
 
-        # json dumps for converting a dict to json 
+        # json dumps for converting a dict to json
         n = json.dumps(n, default=json_util.default, use_decimal=True)
 
         return n
@@ -317,7 +319,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
         # For getting the values from SQL object
         for m in r:
 
-                # create a dict with values 
+                # create a dict with values
                 g = m.__dict__
 
                 # Eliminate the Alchemy object
@@ -329,7 +331,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
                 # Key value pair for tenant_id and invoice_details
                 n[tenant_id].append(g)
 
-        # json dumps for converting a dict to json 
+        # json dumps for converting a dict to json
         n = json.dumps(n, default=json_util.default, use_decimal=True)
 
         return n
@@ -356,7 +358,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
                                         total_cost = total_cost,
                                         paid_cost = paid_cost,
                                         balance_cost = balance_cost,
-                                        payment_status = payment_status) 
+                                        payment_status = payment_status)
         try:
             with session.begin():
                 session.add(invoice)
@@ -394,7 +396,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
                 invoice_details = None
 
         # invoice_details none
-        if invoice_details is None: 
+        if invoice_details is None:
            return invoice_details
 
         # invoice details not none

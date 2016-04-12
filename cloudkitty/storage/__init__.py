@@ -58,11 +58,11 @@ class NoTimeFrame(Exception):
 @six.add_metaclass(abc.ABCMeta)
 class BaseStorage(object):
     """Base Storage class:
-
         Handle incoming data from the global orchestrator, and store them.
     """
-    def __init__(self, period=CONF.collect.period):
-        self._period = period
+    def __init__(self, **kwargs):
+        self._period = kwargs.get('period', CONF.collect.period)
+        self._collector = kwargs.get('collector')
 
         # State vars
         self.usage_start = {}
