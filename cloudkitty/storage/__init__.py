@@ -36,15 +36,16 @@ CONF.register_opts(storage_opts, group='storage')
 CONF.import_opt('period', 'cloudkitty.collector', 'collect')
 
 
-def get_storage():
-    storage_args = {'period': cfg.CONF.collect.period}
+def get_storage(collector=None):
+    storage_args = {
+        'period': CONF.collect.period,
+        'collector': collector if collector else ck_collector.get_collector()}
     backend = driver.DriverManager(
         STORAGES_NAMESPACE,
         cfg.CONF.storage.backend,
         invoke_on_load=True,
         invoke_kwds=storage_args).driver
     return backend
-
 
 class NoTimeFrame(Exception):
     """Raised when there is no time frame available."""
@@ -174,7 +175,7 @@ class BaseStorage(object):
         :param tenant_id: tenant_id to filter on.
         """
 
-    # Modified by Muralidharan.s for applying a logic for getting 
+    # Modified by Muralidharan.s for applying a logic for getting
     # Total value based on Instance
     @abc.abstractmethod
     def get_total(self, begin=None, end=None, tenant_id=None, service=None, instance_id=None):
@@ -269,7 +270,7 @@ class BaseStorage(object):
         :type res_type: str
         :param tenant_name: tenant name details
         :type res_type: str
-        :param total_cost: total cost detail 
+        :param total_cost: total cost detail
         :type res_type: str
         :param paid_cost: paid_cost detail
         :type res_type: str
@@ -287,7 +288,7 @@ class BaseStorage(object):
 
         :param invoice_id: invoice_id values
         :type res_type: str
-        :param total_cost: total cost detail 
+        :param total_cost: total cost detail
         :type res_type: str
         :param paid_cost: paid_cost detail
         :type res_type: str
