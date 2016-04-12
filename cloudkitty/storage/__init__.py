@@ -21,6 +21,7 @@ from oslo_config import cfg
 import six
 from stevedore import driver
 
+from cloudkitty import collector as ck_collector
 from cloudkitty import utils as ck_utils
 
 STORAGES_NAMESPACE = 'cloudkitty.storage.backends'
