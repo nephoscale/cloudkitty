@@ -43,8 +43,7 @@ collect_opts = [
                          'volume',
                          'network.bw.in',
                          'network.bw.out',
-                         'network.floating',
-			 'cloudstorage',],
+                         'network.floating'],
                 help='Services to monitor.'), ]
 
 CONF = cfg.CONF

@@ -53,7 +53,7 @@ class RatedDataFrame(Base, models.ModelBase):
     desc = sqlalchemy.Column(sqlalchemy.Text(),
                              nullable=False)
 
-    def to_cloudkitty(self):
+    def to_cloudkitty(self, collector=None):
         # Rating informations
         rating_dict = {}
         rating_dict['price'] = self.rate
@@ -85,7 +85,6 @@ class RatedDataFrame(Base, models.ModelBase):
         ck_dict['usage'] = usage_dict
         return ck_dict
 
-
 # New Table for Storing 
 # Invoice Details
 # Invoice Details
@@ -98,11 +97,11 @@ class InvoiceDetails(Base, models.ModelBase):
 
     id = sqlalchemy.Column(sqlalchemy.Integer,
                            primary_key=True)
-    invoice_date = sqlalchemy.Column(sqlalchemy.DateTime,
+    invoice_date = sqlalchemy.Column(sqlalchemy.String(255),
                               nullable=False)
-    invoice_period_from = sqlalchemy.Column(sqlalchemy.DateTime,
+    invoice_period_from = sqlalchemy.Column(sqlalchemy.String(255),
                               nullable=False)
-    invoice_period_to = sqlalchemy.Column(sqlalchemy.DateTime,
+    invoice_period_to = sqlalchemy.Column(sqlalchemy.String(255),
                               nullable=False)
     tenant_id = sqlalchemy.Column(sqlalchemy.String(255),
                                   nullable=False)
@@ -115,8 +114,8 @@ class InvoiceDetails(Base, models.ModelBase):
     total_cost = sqlalchemy.Column(sqlalchemy.Float(precision='13,2'),
                              nullable=True)
     paid_cost = sqlalchemy.Column(sqlalchemy.Float(precision='13,2'),
-                             nullable=True) 
+                             nullable=True)
     balance_cost = sqlalchemy.Column(sqlalchemy.Float(precision='13,2'),
-                             nullable=True) 
+                             nullable=True)
     payment_status = sqlalchemy.Column(sqlalchemy.Integer,
-                             nullable=True) 
+                             nullable=True)

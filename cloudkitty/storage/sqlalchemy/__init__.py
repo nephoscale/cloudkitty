@@ -13,11 +13,11 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 #
-# @author: St�phane Albert
+# @author: Stéphane Albert
 #
+import decimal
 import json
 from collections import defaultdict
-from bson import json_util
 from sqlalchemy import and_
 
 from oslo_db.sqlalchemy import utils
@@ -34,14 +34,6 @@ import sqlalchemy.orm.interfaces
 import sqlalchemy.exc
 import datetime
 import simplejson as json
-
-import decimal, simplejson
-class DecimalJSONEncoder(simplejson.JSONEncoder):
-    def default(self, o):
-        if isinstance(o, decimal.Decimal):
-            return str(o)
-        return super(DecimalJSONEncoder, self).default(o)
-
 
 class SQLAlchemyStorage(storage.BaseStorage):
     """SQLAlchemy Storage Backend
@@ -87,20 +79,18 @@ class SQLAlchemyStorage(storage.BaseStorage):
     def get_state(self, tenant_id=None):
         session = db.get_session()
         q = utils.model_query(
-            models.RatedDataFrame,
-            session
-        )
+            self.frame_model,
+            session)
         if tenant_id:
             q = q.filter(
-                models.RatedDataFrame.tenant_id == tenant_id
-            )
-        r = q.order_by(
-            models.RatedDataFrame.begin.desc()
-        ).first()
+                self.frame_model.tenant_id == tenant_id)
+        q = q.order_by(
+            self.frame_model.begin.desc())
+        r = q.first()
         if r:
             return ck_utils.dt2ts(r.begin)
 
-    # Modified by Muralidharan.s for applying a logic for getting
+    # Modified by Muralidharan.s for applying a logic for getting 
     # Total value based on Instance
     def get_total(self, begin=None, end=None, tenant_id=None, service=None, instance_id=None):
         model = models.RatedDataFrame
@@ -155,7 +145,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
         # For getting the values from SQL object
         for m in r:
 
-                # create a dict with values
+                # create a dict with values 
                 g = m.__dict__
 
                 # Eliminate the Alchemy object
@@ -167,14 +157,14 @@ class SQLAlchemyStorage(storage.BaseStorage):
                 # Key value pair for tenant_id and invoice_details
                 n[tenant_id].append(g)
 
-        # json dumps for converting a dict to json
-        n = json.dumps(n, default=json_util.default, use_decimal=True)
+        # json dumps for converting a dict to json 
+        n = json.dumps(n, use_decimal=True)
 
         return n
 
     # For getting a invoice details as needed
     # admin tenant section
-    # can use invoice-id, payment_status and tenant-id arguments
+    # can use invoice-id, payment_status and tenant-id arguments 
     def get_invoice(self, tenant_id=None, invoice_id=None, payment_status=None):
 
         model = models.InvoiceDetails
@@ -202,7 +192,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
         # For getting the values from SQL object
         for m in r:
 
-                # create a dict with values
+                # create a dict with values 
                 g = m.__dict__
 
                 # Eliminate the Alchemy object
@@ -214,8 +204,8 @@ class SQLAlchemyStorage(storage.BaseStorage):
                 # Key value pair for tenant_id and invoice_details
                 n[tenant_id].append(g)
 
-        # json dumps for converting a dict to json
-        n = json.dumps(n, default=json_util.default, use_decimal=True)
+        # json dumps for converting a dict to json 
+        n = json.dumps(n, use_decimal=True)
 
         return n
 
@@ -244,7 +234,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
         # For getting the values from SQL object
         for m in r:
 
-                # create a dict with values
+                # create a dict with values 
                 g = m.__dict__
 
                 # Eliminate the Alchemy object
@@ -256,11 +246,10 @@ class SQLAlchemyStorage(storage.BaseStorage):
                 # Key value pair for tenant_id and invoice_details
                 n[tenant_id].append(g)
 
-        # json dumps for converting a dict to json
-        n = json.dumps(n, default=json_util.default, use_decimal=True)
+        # json dumps for converting a dict to json 
+        n = json.dumps(n, use_decimal=True)
 
         return n
-
 
     # For showing a invoice details as needed
     # admin tenant section
@@ -282,7 +271,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
         # For getting the values from SQL object
         for m in r:
 
-                # create a dict with values
+                # create a dict with values 
                 g = m.__dict__
 
                 # Eliminate the Alchemy object
@@ -294,8 +283,8 @@ class SQLAlchemyStorage(storage.BaseStorage):
                 # Key value pair for tenant_id and invoice_details
                 n[tenant_id].append(g)
 
-        # json dumps for converting a dict to json
-        n = json.dumps(n, default=json_util.default, use_decimal=True)
+        # json dumps for converting a dict to json 
+        n = json.dumps(n, use_decimal=True)
 
         return n
 
@@ -319,7 +308,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
         # For getting the values from SQL object
         for m in r:
 
-                # create a dict with values
+                # create a dict with values 
                 g = m.__dict__
 
                 # Eliminate the Alchemy object
@@ -331,12 +320,10 @@ class SQLAlchemyStorage(storage.BaseStorage):
                 # Key value pair for tenant_id and invoice_details
                 n[tenant_id].append(g)
 
-        # json dumps for converting a dict to json
-        n = json.dumps(n, default=json_util.default, use_decimal=True)
+        # json dumps for converting a dict to json 
+        n = json.dumps(n, use_decimal=True)
 
         return n
-
-
 
     # add invoice to the table
     def add_invoice(self, invoice_id, invoice_date, invoice_period_from, invoice_period_to, tenant_id, invoice_data, tenant_name, total_cost, paid_cost, balance_cost, payment_status):
@@ -358,7 +345,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
                                         total_cost = total_cost,
                                         paid_cost = paid_cost,
                                         balance_cost = balance_cost,
-                                        payment_status = payment_status)
+                                        payment_status = payment_status) 
         try:
             with session.begin():
                 session.add(invoice)
@@ -396,7 +383,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
                 invoice_details = None
 
         # invoice_details none
-        if invoice_details is None:
+        if invoice_details is None: 
            return invoice_details
 
         # invoice details not none
@@ -432,9 +419,8 @@ class SQLAlchemyStorage(storage.BaseStorage):
             except sqlalchemy.orm.exc.NoResultFound:
                 invoice_deleted = None
 
-    def get_tenants(self, begin=None, end=None):
-        model = models.RatedDataFrame
 
+    def get_tenants(self, begin=None, end=None):
         # Boundary calculation
         if not begin:
             begin = ck_utils.get_month_start()
@@ -443,65 +429,64 @@ class SQLAlchemyStorage(storage.BaseStorage):
 
         session = db.get_session()
         q = utils.model_query(
-            model,
-            session
-        ).filter(
-            model.begin >= begin,
-            model.end <= end
-        )
+            self.frame_model,
+            session)
+        q = q.filter(
+            self.frame_model.begin >= begin,
+            self.frame_model.end <= end)
         tenants = q.distinct().values(
-            model.tenant_id
-        )
+            self.frame_model.tenant_id)
         return [tenant.tenant_id for tenant in tenants]
 
     def get_time_frame(self, begin, end, **filters):
-        model = models.RatedDataFrame
         session = db.get_session()
         q = utils.model_query(
-            model,
-            session
-        ).filter(
-            model.begin >= ck_utils.ts2dt(begin),
-            model.end <= ck_utils.ts2dt(end)
-        )
+            self.frame_model,
+            session)
+        q = q.filter(
+            self.frame_model.begin >= ck_utils.ts2dt(begin),
+            self.frame_model.end <= ck_utils.ts2dt(end))
         for filter_name, filter_value in filters.items():
             if filter_value:
-                q = q.filter(getattr(model, filter_name) == filter_value)
+                q = q.filter(
+                    getattr(self.frame_model, filter_name) == filter_value)
         if not filters.get('res_type'):
-            q = q.filter(model.res_type != '_NO_DATA_')
+            q = q.filter(self.frame_model.res_type != '_NO_DATA_')
         count = q.count()
         if not count:
             raise storage.NoTimeFrame()
         r = q.all()
-        return [entry.to_cloudkitty() for entry in r]
+        return [entry.to_cloudkitty(self._collector) for entry in r]
 
     def _append_time_frame(self, res_type, frame, tenant_id):
         vol_dict = frame['vol']
         qty = vol_dict['qty']
         unit = vol_dict['unit']
-        rating_dict = frame['rating']
-        rate = rating_dict['price']
+        rating_dict = frame.get('rating', {})
+        rate = rating_dict.get('price')
+        if not rate:
+            rate = decimal.Decimal(0)
         desc = json.dumps(frame['desc'])
-        self.add_time_frame(self.usage_start_dt.get(tenant_id),
-                            self.usage_end_dt.get(tenant_id),
-                            tenant_id,
-                            unit,
-                            qty,
-                            res_type,
-                            rate,
-                            desc)
+        self.add_time_frame(begin=self.usage_start_dt.get(tenant_id),
+                            end=self.usage_end_dt.get(tenant_id),
+                            tenant_id=tenant_id,
+                            unit=unit,
+                            qty=qty,
+                            res_type=res_type,
+                            rate=rate,
+                            desc=desc)
 
-    def add_time_frame(self, begin, end, tenant_id, unit, qty, res_type,
-                       rate, desc):
+    def add_time_frame(self, **kwargs):
         """Create a new time frame.
 
+        :param begin: Start of the dataframe.
+        :param end: End of the dataframe.
+        :param tenant_id: tenant_id of the dataframe owner.
+        :param unit: Unit of the metric.
+        :param qty: Quantity of the metric.
+        :param res_type: Type of the resource.
+        :param rate: Calculated rate for this dataframe.
+        :param desc: Resource description (metadata).
         """
-        frame = models.RatedDataFrame(begin=begin,
-                                      end=end,
-                                      tenant_id=tenant_id,
-                                      unit=unit,
-                                      qty=qty,
-                                      res_type=res_type,
-                                      rate=rate,
-                                      desc=desc)
-        self._session[tenant_id].add(frame)
+        frame = self.frame_model(**kwargs)
+        self._session[kwargs.get('tenant_id')].add(frame)
