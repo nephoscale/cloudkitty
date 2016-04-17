@@ -24,17 +24,16 @@ from stevedore import driver
 from cloudkitty import collector as ck_collector
 from cloudkitty import utils as ck_utils
 
-STORAGES_NAMESPACE = 'cloudkitty.storage.backends'
-CONF = cfg.CONF
-
 storage_opts = [
     cfg.StrOpt('backend',
                default='sqlalchemy',
                help='Name of the storage backend driver.')
 ]
 
+CONF = cfg.CONF
 CONF.register_opts(storage_opts, group='storage')
-CONF.import_opt('period', 'cloudkitty.collector', 'collect')
+
+STORAGES_NAMESPACE = 'cloudkitty.storage.backends'
 
 
 def get_storage(collector=None):
@@ -48,6 +47,7 @@ def get_storage(collector=None):
         invoke_kwds=storage_args).driver
     return backend
 
+
 class NoTimeFrame(Exception):
     """Raised when there is no time frame available."""
 
@@ -59,6 +59,7 @@ class NoTimeFrame(Exception):
 @six.add_metaclass(abc.ABCMeta)
 class BaseStorage(object):
     """Base Storage class:
+
         Handle incoming data from the global orchestrator, and store them.
     """
     def __init__(self, **kwargs):
@@ -176,7 +177,7 @@ class BaseStorage(object):
         :param tenant_id: tenant_id to filter on.
         """
 
-    # Modified by Muralidharan.s for applying a logic for getting
+    # Modified by Muralidharan.s for applying a logic for getting 
     # Total value based on Instance
     @abc.abstractmethod
     def get_total(self, begin=None, end=None, tenant_id=None, service=None, instance_id=None):
@@ -271,7 +272,7 @@ class BaseStorage(object):
         :type res_type: str
         :param tenant_name: tenant name details
         :type res_type: str
-        :param total_cost: total cost detail
+        :param total_cost: total cost detail 
         :type res_type: str
         :param paid_cost: paid_cost detail
         :type res_type: str
@@ -289,7 +290,7 @@ class BaseStorage(object):
 
         :param invoice_id: invoice_id values
         :type res_type: str
-        :param total_cost: total cost detail
+        :param total_cost: total cost detail 
         :type res_type: str
         :param paid_cost: paid_cost detail
         :type res_type: str

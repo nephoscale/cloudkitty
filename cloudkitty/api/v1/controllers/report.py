@@ -25,6 +25,7 @@ import wsmeext.pecan as wsme_pecan
 
 from cloudkitty.common import policy
 
+
 class ReportController(rest.RestController):
     """REST Controller managing the reporting.
 
