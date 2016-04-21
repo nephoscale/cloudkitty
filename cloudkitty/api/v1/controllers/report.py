@@ -77,7 +77,7 @@ class ReportController(rest.RestController):
 
     # For getting the invoice for admin and non-admin tenants
     # Can get the invoice based on invoice-id , tenant-id and payment-status
-    @wsme_pecan.wsexpose(decimal.Decimal,
+    @wsme_pecan.wsexpose([wtypes.text],
                          wtypes.text,
                          wtypes.text,
                          wtypes.text)
@@ -121,13 +121,13 @@ class ReportController(rest.RestController):
                 pecan.abort(405, six.text_type())
 
 
-        return invoice if invoice else "No Invoice found"
+        return invoice
 
     # For invoice-list 
     # Generate invoice-list results
     # admin and non-admin tenant can be able to get the result 
     # Only admin tenant can be able to use all-tenants arg
-    @wsme_pecan.wsexpose(decimal.Decimal,
+    @wsme_pecan.wsexpose([wtypes.text],
                          wtypes.text)
     def list_invoice(self, all_tenants=None):
         """Return the Invoice details.
@@ -153,14 +153,14 @@ class ReportController(rest.RestController):
         elif 'admin' not in roles and all_tenants is not None:
                 pecan.abort(403, six.text_type())
 
-        return invoice if invoice else "No Invoice found"
+        return invoice
 
 
     # For invoice-show 
     # Generate invoice-show results
     # admin and non-admin tenant can be able to get the result
     # Will show the full details of invoice  
-    @wsme_pecan.wsexpose(decimal.Decimal,
+    @wsme_pecan.wsexpose([wtypes.text],
                          wtypes.text)
     def show_invoice(self, invoice_id):
         """Return the Invoice details.
@@ -183,7 +183,7 @@ class ReportController(rest.RestController):
         elif 'admin' not in roles:
                 invoice = storage.show_invoice_for_tenant(tenant_name, invoice_id)
 
-        return invoice if invoice else "No Invoice found"
+        return invoice
 
     # adding the invoice
     @wsme_pecan.wsexpose(decimal.Decimal,
@@ -229,7 +229,7 @@ class ReportController(rest.RestController):
                                               payment_status)
 
     # Updating the invoice
-    @wsme_pecan.wsexpose(decimal.Decimal,
+    @wsme_pecan.wsexpose([wtypes.text],
                          wtypes.text,
                          wtypes.text,
                          wtypes.text,
@@ -259,11 +259,10 @@ class ReportController(rest.RestController):
                                               paid_cost,
                                               balance_cost,
                                               payment_status)
-
         return invoice
 
     # Delete the Invoice
-    @wsme_pecan.wsexpose(decimal.Decimal,
+    @wsme_pecan.wsexpose([wtypes.text],
                          wtypes.text)
     def delete_invoice(self, invoice_id):
         """

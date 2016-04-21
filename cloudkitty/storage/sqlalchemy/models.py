@@ -85,9 +85,6 @@ class RatedDataFrame(Base, models.ModelBase):
         ck_dict['usage'] = usage_dict
         return ck_dict
 
-# New Table for Storing 
-# Invoice Details
-# Invoice Details
 class InvoiceDetails(Base, models.ModelBase):
     """Invoice details table.
     """
@@ -97,11 +94,11 @@ class InvoiceDetails(Base, models.ModelBase):
 
     id = sqlalchemy.Column(sqlalchemy.Integer,
                            primary_key=True)
-    invoice_date = sqlalchemy.Column(sqlalchemy.String(255),
+    invoice_date = sqlalchemy.Column(sqlalchemy.DateTime,
                               nullable=False)
-    invoice_period_from = sqlalchemy.Column(sqlalchemy.String(255),
+    invoice_period_from = sqlalchemy.Column(sqlalchemy.DateTime,
                               nullable=False)
-    invoice_period_to = sqlalchemy.Column(sqlalchemy.String(255),
+    invoice_period_to = sqlalchemy.Column(sqlalchemy.DateTime,
                               nullable=False)
     tenant_id = sqlalchemy.Column(sqlalchemy.String(255),
                                   nullable=False)
@@ -119,3 +116,21 @@ class InvoiceDetails(Base, models.ModelBase):
                              nullable=True)
     payment_status = sqlalchemy.Column(sqlalchemy.Integer,
                              nullable=True)
+
+    def to_cloudkitty(self):
+
+        invoice_dict = {}
+        invoice_dict['id'] = self.id
+        invoice_dict['invoice_date'] = ck_utils.dt2iso(self.invoice_date)
+        invoice_dict['invoice_period_from'] = ck_utils.dt2iso(self.invoice_period_from)
+        invoice_dict['invoice_period_to'] = ck_utils.dt2iso(self.invoice_period_to)
+        invoice_dict['tenant_id'] = self.tenant_id
+        invoice_dict['tenant_name'] = self.tenant_name
+        invoice_dict['invoice_id'] = self.invoice_id
+        invoice_dict['invoice_data'] = json.loads(self.invoice_data)
+        invoice_dict['total_cost'] = json.dumps(self.total_cost, use_decimal=True)
+        invoice_dict['paid_cost'] = json.dumps(self.paid_cost, use_decimal=True)
+        invoice_dict['balance_cost'] = json.dumps(self.balance_cost, use_decimal=True)
+        invoice_dict['payment_status'] = self.payment_status
+
+        return invoice_dict
