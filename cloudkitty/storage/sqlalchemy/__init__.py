@@ -136,31 +136,10 @@ class SQLAlchemyStorage(storage.BaseStorage):
         if all_tenants:
                 q = session.query(model).order_by(model.id)
 
-        # Defaultdict for storing datas
-        n = defaultdict(list)
-
         # Fetch all the values
         r = q.all()
 
-        # For getting the values from SQL object
-        for m in r:
-
-                # create a dict with values 
-                g = m.__dict__
-
-                # Eliminate the Alchemy object
-                g.pop('_sa_instance_state', None)
-
-                # Fetch the tenant_id
-                tenant_id = g['tenant_id']
-
-                # Key value pair for tenant_id and invoice_details
-                n[tenant_id].append(g)
-
-        # json dumps for converting a dict to json 
-        n = json.dumps(n, use_decimal=True)
-
-        return n
+        return [entry.to_cloudkitty() for entry in r]
 
     # For getting a invoice details as needed
     # admin tenant section
@@ -182,32 +161,10 @@ class SQLAlchemyStorage(storage.BaseStorage):
         if payment_status:
                 q = session.query(model).order_by(model.id).filter(model.payment_status == payment_status)
 
-
-        # Defaultdict for storing datas
-        n = defaultdict(list)
-
         # Fetch all the values
         r = q.all()
 
-        # For getting the values from SQL object
-        for m in r:
-
-                # create a dict with values 
-                g = m.__dict__
-
-                # Eliminate the Alchemy object
-                g.pop('_sa_instance_state', None)
-
-                # Fetch the tenant_id
-                tenant_id = g['tenant_id']
-
-                # Key value pair for tenant_id and invoice_details
-                n[tenant_id].append(g)
-
-        # json dumps for converting a dict to json 
-        n = json.dumps(n, use_decimal=True)
-
-        return n
+        return [entry.to_cloudkitty() for entry in r]
 
     # Invoice for non-admin tenanti
     # get the invoice for non-admin tenant
@@ -225,31 +182,10 @@ class SQLAlchemyStorage(storage.BaseStorage):
         if payment_status:
                 q = session.query(model).order_by(model.id).filter(and_(model.payment_status == payment_status, model.tenant_name == tenant_name))
 
-        # Defaultdict for storing datas
-        n = defaultdict(list)
-
         # Fetch all the values
         r = q.all()
 
-        # For getting the values from SQL object
-        for m in r:
-
-                # create a dict with values 
-                g = m.__dict__
-
-                # Eliminate the Alchemy object
-                g.pop('_sa_instance_state', None)
-
-                # Fetch the tenant_id
-                tenant_id = g['tenant_id']
-
-                # Key value pair for tenant_id and invoice_details
-                n[tenant_id].append(g)
-
-        # json dumps for converting a dict to json 
-        n = json.dumps(n, use_decimal=True)
-
-        return n
+        return [entry.to_cloudkitty() for entry in r]
 
     # For showing a invoice details as needed
     # admin tenant section
@@ -262,31 +198,10 @@ class SQLAlchemyStorage(storage.BaseStorage):
         if invoice_id:
                 q = session.query(model).order_by(model.id).filter(and_(model.invoice_id == invoice_id, model.tenant_name == tenant_name))
 
-        # Defaultdict for storing datas
-        n = defaultdict(list)
-
         # Fetch all the values
         r = q.all()
 
-        # For getting the values from SQL object
-        for m in r:
-
-                # create a dict with values 
-                g = m.__dict__
-
-                # Eliminate the Alchemy object
-                g.pop('_sa_instance_state', None)
-
-                # Fetch the tenant_id
-                tenant_id = g['tenant_id']
-
-                # Key value pair for tenant_id and invoice_details
-                n[tenant_id].append(g)
-
-        # json dumps for converting a dict to json 
-        n = json.dumps(n, use_decimal=True)
-
-        return n
+        return [entry.to_cloudkitty() for entry in r]
 
     # For showing a invoice details as needed
     # non-admin tenant section
@@ -299,31 +214,10 @@ class SQLAlchemyStorage(storage.BaseStorage):
         if invoice_id:
                 q = session.query(model).order_by(model.id).filter(model.invoice_id == invoice_id)
 
-        # Defaultdict for storing datas
-        n = defaultdict(list)
-
         # Fetch all the values
         r = q.all()
 
-        # For getting the values from SQL object
-        for m in r:
-
-                # create a dict with values 
-                g = m.__dict__
-
-                # Eliminate the Alchemy object
-                g.pop('_sa_instance_state', None)
-
-                # Fetch the tenant_id
-                tenant_id = g['tenant_id']
-
-                # Key value pair for tenant_id and invoice_details
-                n[tenant_id].append(g)
-
-        # json dumps for converting a dict to json 
-        n = json.dumps(n, use_decimal=True)
-
-        return n
+        return [entry.to_cloudkitty() for entry in r]
 
     # add invoice to the table
     def add_invoice(self, invoice_id, invoice_date, invoice_period_from, invoice_period_to, tenant_id, invoice_data, tenant_name, total_cost, paid_cost, balance_cost, payment_status):
@@ -383,7 +277,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
                 invoice_details = None
 
         # invoice_details none
-        if invoice_details is None: 
+        if invoice_details is None:
            return invoice_details
 
         # invoice details not none
@@ -398,8 +292,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
            if paid_cost:
                 invoice_detail['paid_cost'] = invoice_details.paid_cost
            if payment_status:
-                invoice_detail['payment_status'] = invoice_details.payment_status
-           invoice_detail = json.dumps(invoice_detail, use_decimal=True)
+                invoice_detail['payment_status'] = invoice_details.payment_status 
            return invoice_detail
 
     # delete invoice entries in table
@@ -418,7 +311,6 @@ class SQLAlchemyStorage(storage.BaseStorage):
 
             except sqlalchemy.orm.exc.NoResultFound:
                 invoice_deleted = None
-
 
     def get_tenants(self, begin=None, end=None):
         # Boundary calculation

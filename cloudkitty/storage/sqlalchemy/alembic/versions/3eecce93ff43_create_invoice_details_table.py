@@ -16,9 +16,9 @@ import sqlalchemy as sa
 def upgrade():
     op.create_table('invoice_details',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('invoice_date', sa.String(length=255), nullable=False),
-    sa.Column('invoice_period_from', sa.String(length=255), nullable=False),
-    sa.Column('invoice_period_to', sa.String(length=255), nullable=False),
+    sa.Column('invoice_date', sa.DateTime(), nullable=False),
+    sa.Column('invoice_period_from', sa.DateTime(), nullable=False),
+    sa.Column('invoice_period_to', sa.DateTime(), nullable=False),
     sa.Column('tenant_id', sa.String(length=255), nullable=False),
     sa.Column('tenant_name', sa.String(length=255), nullable=False),
     sa.Column('invoice_id', sa.String(length=255), nullable=False),
