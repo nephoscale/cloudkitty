@@ -15,7 +15,7 @@
 #
 # @author: Stéphane Albert
 #
-import json
+import simplejson as json
 
 from oslo_db.sqlalchemy import models
 import sqlalchemy
