@@ -348,3 +348,29 @@ class CeilometerCollector(collector.BaseCollector):
             cloud_volume_data.append(self.t_cloudkitty.format_item(cloud_volume,
                                                              'B',
                                                              cloud_volume_gb))
+
+    # For enabling instance based add-on rates
+    def get_instance_addon(self, start, end=None, project_id=None, q_filter=None):
+        active_instance_ids = self.active_resources('instance', start, end,
+                                                    project_id, q_filter)
+
+        instance_addon_data = []
+        for instance_id in active_instance_ids:
+            if not self._cacher.has_resource_detail('instance.addon', instance_id):
+                raw_resource = self._conn.resources.get(instance_id)
+
+                instance_addon = self.t_ceilometer.strip_resource_data('instance.addon',
+                                                                 raw_resource)
+                self._cacher.add_resource_detail('instance.addon',
+                                                 instance_id,
+                                                 instance_addon)
+            instance_addon = self._cacher.get_resource_detail('instance.addon',
+                                                        instance_id)
+
+            instance_addon_data.append(self.t_cloudkitty.format_item(instance_addon,
+                                                              'instance.addon',
+                                                              1))
+
+        if not instance_addon_data:
+            raise collector.NoDataCollected(self.collector_name, 'instance.addon')
+        return self.t_cloudkitty.format_service('instance.addon', instance_addon_data)

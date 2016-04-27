@@ -64,6 +64,8 @@ class CeilometerTransformer(transformer.BaseTransformer):
     def strip_resource_data(self, res_type, res_data):
         if res_type == 'compute':
             return self._strip_compute(res_data)
+        elif res_type == 'instance.addon':
+            return self._strip_compute(res_data)
         elif res_type == 'volume':
             return self._strip_volume(res_data)
         else:
