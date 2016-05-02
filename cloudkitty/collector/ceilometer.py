@@ -349,6 +349,11 @@ class CeilometerCollector(collector.BaseCollector):
                                                              'B',
                                                              cloud_volume_gb))
 
+        if not cloud_volume_data:
+            raise collector.NoDataCollected(self.collector_name, 'cloudstorage')
+        return self.t_cloudkitty.format_service('cloudstorage', cloud_volume_data)
+                                                             
+
     # For enabling instance based add-on rates
     def get_instance_addon(self, start, end=None, project_id=None, q_filter=None):
         active_instance_ids = self.active_resources('instance', start, end,
