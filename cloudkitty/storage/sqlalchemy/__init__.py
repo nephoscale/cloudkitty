@@ -330,6 +330,38 @@ class SQLAlchemyStorage(storage.BaseStorage):
             self.frame_model.tenant_id)
         return [tenant.tenant_id for tenant in tenants]
 
+    def add_time_frame_custom(self, **kwargs):
+        """Create a new time frame custom .
+
+        :param begin: Start of the dataframe.
+        :param end: End of the dataframe.
+        :param tenant_id: tenant_id of the dataframe owner.
+        :param unit: Unit of the metric.
+        :param qty: Quantity of the metric.
+        :param res_type: Type of the resource.
+        :param rate: Calculated rate for this dataframe.
+        :param desc: Resource description (metadata).
+        """
+
+        session = db.get_session()
+
+        # Add invoice details
+        frame = models.RatedDataFrame(  
+                                        begin = kwargs.get('begin'),
+                                        end = kwargs.get('end'),
+                                        tenant_id = kwargs.get('tenant_id'),
+                                        unit = kwargs.get('unit'),
+                                        qty = kwargs.get('qty'),
+                                        res_type = kwargs.get('res_type'),
+                                        rate = decimal.Decimal(kwargs.get('rate')),
+                                        desc = json.dumps(kwargs.get('desc')))
+        try:
+            with session.begin():
+                session.add(frame)
+
+        except sqlalchemy.exc.IntegrityError, exc:
+                reason = exc.message
+
     def get_time_frame(self, begin, end, **filters):
         session = db.get_session()
         q = utils.model_query(
