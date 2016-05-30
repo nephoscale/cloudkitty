@@ -44,8 +44,9 @@ collect_opts = [
                          'network.bw.in',
                          'network.bw.out',
                          'network.floating',
-			 'cloudstorage',
-			 'instance.addon',],
+                         'cloudstorage',
+                         'instance.addon',
+                         'tenant.addon',],
                 help='Services to monitor.'), ]
 
 CONF = cfg.CONF
