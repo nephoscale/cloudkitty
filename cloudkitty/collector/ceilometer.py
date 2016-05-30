@@ -198,9 +198,13 @@ class CeilometerCollector(collector.BaseCollector):
                                                  image)
             image = self._cacher.get_resource_detail('image',
                                                      image_id)
+
+            # Convert bytes to GB for rate calculation
+            image_size_gb = image_stats.max / 1073741824.0
             image_data.append(self.t_cloudkitty.format_item(image,
-                                                            'image',
-                                                            image_stats.max))
+                                                            'GB',
+                                                            image_size_gb))
+
         if not image_data:
             raise collector.NoDataCollected(self.collector_name, 'image')
         return self.t_cloudkitty.format_service('image', image_data)
@@ -352,7 +356,7 @@ class CeilometerCollector(collector.BaseCollector):
         if not cloud_volume_data:
             raise collector.NoDataCollected(self.collector_name, 'cloudstorage')
         return self.t_cloudkitty.format_service('cloudstorage', cloud_volume_data)
-                                                             
+
 
     # For enabling instance based add-on rates
     def get_instance_addon(self, start, end=None, project_id=None, q_filter=None):
