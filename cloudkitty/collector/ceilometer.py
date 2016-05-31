@@ -324,12 +324,12 @@ class CeilometerCollector(collector.BaseCollector):
 
     def get_cloudstorage(self, start, end=None, project_id=None, q_filter=None):
 
-        active_cloud_volume_stats = self.resources_stats('storage.objects.incoming.bytes',
+        # To bill in each and every period
+        active_cloud_volume_stats = self.resources_stats('storage.objects.size',
                                                    start,
                                                    end,
                                                    project_id,
                                                    q_filter)
-
         cloud_volume_data = []
 
         for cloud_volume_stats in active_cloud_volume_stats:
@@ -348,9 +348,12 @@ class CeilometerCollector(collector.BaseCollector):
 
             cloud_volume = self._cacher.get_resource_detail('cloudstorage',
                                                       cloud_volume_id)
-            cloud_volume_gb = cloud_volume_stats.max / 1048576.0
+
+            # Convert bytes to GB
+            cloud_volume_gb = cloud_volume_stats.max / 1073741824.0
+
             cloud_volume_data.append(self.t_cloudkitty.format_item(cloud_volume,
-                                                             'B',
+                                                             'GB',
                                                              cloud_volume_gb))
 
         if not cloud_volume_data:
