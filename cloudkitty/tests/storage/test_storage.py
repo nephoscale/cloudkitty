@@ -21,20 +21,10 @@ import mock
 import six
 import sqlalchemy
 import testscenarios
-import logging
-
-try: import simplejson as json
-except ImportError: import json
-
 from cloudkitty import storage
 from cloudkitty import tests
 from cloudkitty.tests import samples
 from cloudkitty import utils as ck_utils
-
-LOG_FILENAME = '/var/log/new.log'
-logging.basicConfig(filename=LOG_FILENAME,
-                    level=logging.DEBUG,
-                    )
 
 class StorageTest(tests.TestCase):
     storage_scenarios = [
