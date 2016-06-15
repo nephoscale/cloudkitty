@@ -27,8 +27,6 @@ from cloudkitty import tests
 from cloudkitty.tests import samples
 from cloudkitty import utils as ck_utils
 
-try: import simplejson as json
-except ImportError: import json
 
 class StorageTest(tests.TestCase):
     storage_scenarios = [
