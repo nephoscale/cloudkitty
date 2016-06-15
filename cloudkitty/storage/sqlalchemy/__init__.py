@@ -15,8 +15,9 @@
 #
 # @author: Stéphane Albert
 #
+try: import simplejson as json
+except ImportError: import json
 import decimal
-import json
 from collections import defaultdict
 from sqlalchemy import and_
 
@@ -33,7 +34,6 @@ import sqlalchemy.ext.declarative
 import sqlalchemy.orm.interfaces
 import sqlalchemy.exc
 import datetime
-import simplejson as json
 
 class SQLAlchemyStorage(storage.BaseStorage):
     """SQLAlchemy Storage Backend
@@ -240,11 +240,12 @@ class SQLAlchemyStorage(storage.BaseStorage):
                                         paid_cost = paid_cost,
                                         balance_cost = balance_cost,
                                         payment_status = payment_status) 
+
         try:
             with session.begin():
                 session.add(invoice)
 
-        except sqlalchemy.exc.IntegrityError, exc:
+        except sqlalchemy.exc.IntegrityError as exc:
                 reason = exc.message
 
         return invoice
@@ -355,11 +356,12 @@ class SQLAlchemyStorage(storage.BaseStorage):
                                         res_type = kwargs.get('res_type'),
                                         rate = decimal.Decimal(kwargs.get('rate')),
                                         desc = json.dumps(kwargs.get('desc')))
+
         try:
             with session.begin():
                 session.add(frame)
 
-        except sqlalchemy.exc.IntegrityError, exc:
+        except sqlalchemy.exc.IntegrityError as exc:
                 reason = exc.message
 
     def get_time_frame(self, begin, end, **filters):

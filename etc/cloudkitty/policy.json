@@ -11,7 +11,7 @@
     "report:get_total": "",
     "report:invoice": "",
     "report:list_invoice": "",
-    "report:show_invoice": "role:admin",
+    "report:show_invoice": "",
     "report:add_invoice": "role:admin",
     "report:update_invoice": "role:admin",
     "report:delete_invoice": "role:admin",

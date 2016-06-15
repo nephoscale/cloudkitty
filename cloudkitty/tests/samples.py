@@ -32,6 +32,7 @@ SECOND_PERIOD_BEGIN = FIRST_PERIOD_END
 SECOND_PERIOD_BEGIN_ISO = ck_utils.ts2iso(SECOND_PERIOD_BEGIN)
 SECOND_PERIOD_END = SECOND_PERIOD_BEGIN + 3600
 SECOND_PERIOD_END_ISO = ck_utils.ts2iso(SECOND_PERIOD_END)
+DEMO_TENANT = '1456f30b11f2414789fd266f855ee894'
 
 COMPUTE_METADATA = {
     'availability_zone': 'nova',
@@ -94,6 +95,100 @@ COLLECTED_DATA = [{
                 'unit': 'instance'}}]
     }}]
 
+# data input for invoice
+# demo user data
+INVOICE_DATA_DEMO = [{
+    'id': '1',
+    'invoice_date': FIRST_PERIOD_BEGIN,
+    'invoice_period_from': FIRST_PERIOD_BEGIN,
+    'invoice_period_to': FIRST_PERIOD_END,
+    'invoice_id': 'demo-5-2016',
+    'total_cost': '6.64',
+    'paid_cost': '0.11',
+    'balance_cost': '6.53',
+    'invoice_data': {
+		'dict_all_cost_total': '6.64',
+		'dict_cloud_storage': '4.00',
+		'dict_volume': '2.64'},
+    'tenant_id': DEMO_TENANT,
+    'payment_status': '0',
+    'tenant_name': 'demo'
+    }]
+
+# demo user data to compare
+INVOICE_DATA_DEMO_COMPARE = [{
+    'id': 1,
+    'invoice_date': '2015-01-01T00:00:00Z',
+    'invoice_period_from': '2015-01-01T00:00:00Z',
+    'invoice_period_to': '2015-01-01T01:00:00Z',
+    'invoice_id': u'demo-5-2016',
+    'total_cost': '6.64',
+    'paid_cost': '0.11',
+    'balance_cost': '6.53',
+    'invoice_data': {
+                u'dict_all_cost_total': u'6.64',
+                u'dict_cloud_storage': u'4.00',
+                u'dict_volume': u'2.64'},
+    'tenant_id': u'1456f30b11f2414789fd266f855ee894',
+    'payment_status': 0,
+    'tenant_name': u'demo'
+    }]
+
+# data input
+# admin user data
+INVOICE_DATA_ADMIN = [{
+    'id': '2',
+    'invoice_date': FIRST_PERIOD_BEGIN,
+    'invoice_period_from': FIRST_PERIOD_BEGIN,
+    'invoice_period_to': FIRST_PERIOD_END,
+    'invoice_id': 'admin-5-2016',
+    'total_cost': '1.64',
+    'paid_cost': '0.11',
+    'balance_cost': '1.53',
+    'invoice_data': {
+                'dict_all_cost_total': '1.64',
+                'dict_cloud_storage': '0.64',
+                'dict_volume': '1.00'},
+    'tenant_id': TENANT,
+    'payment_status': '1',
+    'tenant_name': 'admin'
+    }]
+
+# admin user data to compare
+INVOICE_DATA_ADMIN_COMPARE = [{
+    'id': 2,
+    'invoice_date': '2015-01-01T00:00:00Z',
+    'invoice_period_from': '2015-01-01T00:00:00Z',
+    'invoice_period_to': '2015-01-01T01:00:00Z',
+    'invoice_id': u'admin-5-2016',
+    'total_cost': '1.64',
+    'paid_cost': '0.11',
+    'balance_cost': '1.53',
+    'invoice_data': {
+                u'dict_all_cost_total': u'1.64',
+                u'dict_cloud_storage': u'0.64',
+                u'dict_volume': u'1.00'},
+    'tenant_id': u'f266f30b11f246b589fd266f85eeec39',
+    'payment_status': 1,
+    'tenant_name': u'admin'
+    }]
+
+# all invoice data to compare
+ALL_INVOICES = INVOICE_DATA_DEMO_COMPARE + INVOICE_DATA_ADMIN_COMPARE
+
+# making the data as dict
+def invoice_data(data):
+
+    for invoice in data:
+
+        invoice_dict = invoice
+
+    return invoice_dict
+
+# dict with invoice data 
+INVOICE_DICT_DEMO = invoice_data(INVOICE_DATA_DEMO)
+INVOICE_DICT_ADMIN = invoice_data(INVOICE_DATA_ADMIN)
+
 RATED_DATA = copy.deepcopy(COLLECTED_DATA)
 RATED_DATA[0]['usage']['compute'][0]['rating'] = {
     'price': decimal.Decimal('0.42')}
@@ -104,6 +199,7 @@ RATED_DATA[1]['usage']['compute'][0]['rating'] = {
 
 
 def split_storage_data(raw_data):
+
     final_data = []
     for frame in raw_data:
         frame['period']['begin'] = ck_utils.ts2iso(frame['period']['begin'])

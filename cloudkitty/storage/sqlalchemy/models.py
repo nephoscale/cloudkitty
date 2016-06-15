@@ -15,8 +15,8 @@
 #
 # @author: Stéphane Albert
 #
-import simplejson as json
-
+try: import simplejson as json
+except ImportError: import json
 from oslo_db.sqlalchemy import models
 import sqlalchemy
 from sqlalchemy.ext import declarative
