@@ -144,7 +144,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
     # For getting a invoice details as needed
     # admin tenant section
     # can use invoice-id, payment_status and tenant-id arguments 
-    def get_invoice(self, tenant_id=None, invoice_id=None, payment_status=None):
+    def get_invoice(self, tenant_id=None, tenant_name1=None, invoice_id=None, payment_status=None):
 
         model = models.InvoiceDetails
         session = db.get_session()
@@ -152,6 +152,10 @@ class SQLAlchemyStorage(storage.BaseStorage):
         # Fetch the invoice using tenant ID
         if tenant_id:
                 q = session.query(model).order_by(model.id).filter(model.tenant_id == tenant_id)
+
+        # Fetch the invoices using tenant name
+        if tenant_name1:
+                q = session.query(model).order_by(model.id).filter(model.tenant_name == tenant_name1)
 
         # Fetch the invoice using invoice ID
         if invoice_id:
@@ -166,10 +170,10 @@ class SQLAlchemyStorage(storage.BaseStorage):
 
         return [entry.to_cloudkitty() for entry in r]
 
-    # Invoice for non-admin tenanti
+    # Invoice for non-admin tenant
     # get the invoice for non-admin tenant
     # can be able to fetch using invoice-id and payment_status
-    def get_invoice_for_tenant(self, tenant_name, invoice_id=None, payment_status=None):
+    def get_invoice_for_tenant(self, tenant_name, tenant_name1=None, invoice_id=None, payment_status=None):
 
         model = models.InvoiceDetails
         session = db.get_session()
@@ -177,6 +181,11 @@ class SQLAlchemyStorage(storage.BaseStorage):
         # Fetch the invoice using invoice ID
         if invoice_id:
                 q = session.query(model).order_by(model.id).filter(and_(model.invoice_id == invoice_id, model.tenant_name == tenant_name))
+
+        # Fetch invoices using tenant_name
+        if tenant_name1:
+                q = session.query(model).order_by(model.id).filter(and_(model.tenant_name == tenant_name1, model.tenant_name == tenant_name))
+
 
         # Fetch the invoice using payment_status
         if payment_status:

@@ -80,8 +80,9 @@ class ReportController(rest.RestController):
     @wsme_pecan.wsexpose([wtypes.text],
                          wtypes.text,
                          wtypes.text,
+                         wtypes.text,
                          wtypes.text)
-    def invoice(self, tenant_id=None, invoice_id=None, payment_status=None):
+    def invoice(self, tenant_id=None, tenant_name1=None, invoice_id=None, payment_status=None):
         """Return the Invoice details.
 
         """
@@ -95,12 +96,13 @@ class ReportController(rest.RestController):
         tenant_name = pecan.request.context.__dict__['tenant']
 
         # If tenant_id or invoice_id or payment_status exists
-        if tenant_id or invoice_id or payment_status:
+        if tenant_id or invoice_id or payment_status or tenant_name1:
 
                 # if admin role
                 if 'admin' in roles:
 
-                        invoice = storage.get_invoice(tenant_id, invoice_id, payment_status)
+			# added facility for fetch using tenant_name also
+                        invoice = storage.get_invoice(tenant_id, tenant_name1, invoice_id, payment_status)
 
                 # for non-admin roles
                 else:
@@ -108,7 +110,8 @@ class ReportController(rest.RestController):
                         # for avoiding tenant_id arg for non-admin
                         if not tenant_id:
 
-                                invoice = storage.get_invoice_for_tenant(tenant_name, invoice_id, payment_status)
+				# Added facility for fetch using tenant name too
+                                invoice = storage.get_invoice_for_tenant(tenant_name, tenant_name1, invoice_id, payment_status)
 
                         # for generating a warning message if tenant_id arg passed for non-admin
                         else:
