@@ -76,16 +76,23 @@ class ReportController(rest.RestController):
         return total if total else decimal.Decimal('0')
 
     # For getting the invoice for admin and non-admin tenants
-    # Can get the invoice based on invoice-id , tenant-id and payment-status
+    # Can get the invoice based on invoice-id , tenant-id, tenant-name and payment-status
+    # tenant-name and tenant-id option available for admin tenants
     @wsme_pecan.wsexpose([wtypes.text],
                          wtypes.text,
                          wtypes.text,
                          wtypes.text,
                          wtypes.text)
-    def invoice(self, tenant_id=None, tenant_name1=None, invoice_id=None, payment_status=None):
+    def invoice(self, tenant_id=None, tenant_name=None, invoice_id=None, payment_status=None):
         """Return the Invoice details.
 
         """
+
+	# assigning a tenant_name to another variable tenant
+	# We already have variable named tenant for making decision on type of user and actions
+	# So assigning a new name as tenant
+	tenant = tenant_name
+
         policy.enforce(pecan.request.context, 'report:invoice', {})
         storage = pecan.request.storage_backend
 
@@ -96,22 +103,22 @@ class ReportController(rest.RestController):
         tenant_name = pecan.request.context.__dict__['tenant']
 
         # If tenant_id or invoice_id or payment_status exists
-        if tenant_id or invoice_id or payment_status or tenant_name1:
+        if tenant_id or invoice_id or payment_status or tenant_name:
 
                 # if admin role
                 if 'admin' in roles:
 
-			# added facility for fetch using tenant_name also
-                        invoice = storage.get_invoice(tenant_id, tenant_name1, invoice_id, payment_status)
+			# added facility for fetch using tenant name from user input also
+                        invoice = storage.get_invoice(tenant_id, tenant, invoice_id, payment_status)
 
                 # for non-admin roles
                 else:
 
-                        # for avoiding tenant_id arg for non-admin
-                        if not tenant_id:
+                        # for restricting non-admin users to use tenant-name and tenant-id options
+                        if not (tenant or tenant_id):
 
 				# Added facility for fetch using tenant name too
-                                invoice = storage.get_invoice_for_tenant(tenant_name, tenant_name1, invoice_id, payment_status)
+                                invoice = storage.get_invoice_for_tenant(tenant_name, invoice_id, payment_status)
 
                         # for generating a warning message if tenant_id arg passed for non-admin
                         else:
