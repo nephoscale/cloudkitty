@@ -448,7 +448,7 @@ class StorageTest(tests.TestCase):
 
         self.add_invoice()
         data = self.storage.get_invoice(
-            tenant_name1=samples.INVOICE_DICT_ADMIN['tenant_name'])
+            tenant=samples.INVOICE_DICT_ADMIN['tenant_name'])
         working_data = copy.deepcopy(samples.INVOICE_DATA_ADMIN_COMPARE)
         self.assertEqual(working_data, data)
 
@@ -479,18 +479,6 @@ class StorageTest(tests.TestCase):
             tenant_name=samples.INVOICE_DICT_DEMO['tenant_name'])
         working_data = copy.deepcopy(samples.INVOICE_DATA_DEMO_COMPARE)
         self.assertEqual(working_data, data)
-
-    # get invoice based on tenant_name
-    # non admin user
-    def test_get_invoice_based_on_tenant_name_non_admin(self):
-
-        self.add_invoice()
-        data = self.storage.get_invoice_for_tenant(
-            tenant_name1=samples.INVOICE_DICT_DEMO['tenant_name'],
-            tenant_name=samples.INVOICE_DICT_DEMO['tenant_name'])
-        working_data = copy.deepcopy(samples.INVOICE_DATA_DEMO_COMPARE)
-        self.assertEqual(working_data, data)
-
 
     """"""""""""""""""""""""
     #Admin user - list invoice
