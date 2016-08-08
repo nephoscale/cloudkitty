@@ -21,12 +21,14 @@ import mock
 import six
 import sqlalchemy
 import testscenarios
+
+try: import simplejson as json
+except ImportError: import json
+
 from cloudkitty import storage
 from cloudkitty import tests
 from cloudkitty.tests import samples
 from cloudkitty import utils as ck_utils
-try: import simplejson as json
-except ImportError: import json
 
 class StorageTest(tests.TestCase):
     storage_scenarios = [
@@ -379,7 +381,6 @@ class StorageTest(tests.TestCase):
             [self._other_tenant_id],
             tenants)
 
-
     def add_invoice(self):
 
         self.storage.add_invoice(invoice_id=samples.INVOICE_DICT_DEMO['invoice_id'],
@@ -440,7 +441,18 @@ class StorageTest(tests.TestCase):
             invoice_id=samples.INVOICE_DICT_ADMIN['invoice_id'])
         working_data = copy.deepcopy(samples.INVOICE_DATA_ADMIN_COMPARE)
         self.assertEqual(working_data, data)
-  
+ 
+    # get invoice based on tenant name
+    # admin user
+    def test_get_invoice_based_on_tenant_name(self):
+
+        self.add_invoice()
+        data = self.storage.get_invoice(
+            tenant=samples.INVOICE_DICT_ADMIN['tenant_name'])
+        working_data = copy.deepcopy(samples.INVOICE_DATA_ADMIN_COMPARE)
+        self.assertEqual(working_data, data)
+
+ 
     """"""""""""""""""""""""
     #Non-Admin user - get invoice
     """"""""""""""""""""""""

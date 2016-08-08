@@ -197,10 +197,12 @@ class BaseStorage(object):
 
     # Get invoice for admin tenant
     @abc.abstractmethod
-    def get_invoice(self, tenant_id=None, invoice_id= None, payment_status=None):
+    def get_invoice(self, tenant_id=None, tenant=None, invoice_id= None, payment_status=None):
         """Return the invoice.
 
         :param tenant_id: Filter on the tenant_id.
+        :type res_type: str
+        :param tenant: Filter on the tenant name as input
         :type res_type: str
         :param invoice_id: Filter on the invoice_id.
         :type res_type: str
@@ -213,8 +215,8 @@ class BaseStorage(object):
     def get_invoice_for_tenant(self, tenant_name, invoice_id= None, payment_status=None):
         """Return the invoice.
 
-        :param tenant_name: Filter on the tenant_name.
-        :type res_type: str
+	:param tenant_name: tenant_name from request
+	:type res_type: str
         :param invoice_id: Filter on the invoice_id.
         :type res_type: str
         :param payment_status: Filter on the payment_status.

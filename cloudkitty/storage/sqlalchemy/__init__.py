@@ -143,8 +143,8 @@ class SQLAlchemyStorage(storage.BaseStorage):
 
     # For getting a invoice details as needed
     # admin tenant section
-    # can use invoice-id, payment_status and tenant-id arguments 
-    def get_invoice(self, tenant_id=None, invoice_id=None, payment_status=None):
+    # can get invoice based on tenant id, tenant name, invoice id and payment status 
+    def get_invoice(self, tenant_id=None, tenant=None, invoice_id=None, payment_status=None):
 
         model = models.InvoiceDetails
         session = db.get_session()
@@ -152,6 +152,10 @@ class SQLAlchemyStorage(storage.BaseStorage):
         # Fetch the invoice using tenant ID
         if tenant_id:
                 q = session.query(model).order_by(model.id).filter(model.tenant_id == tenant_id)
+
+        # Fetch the invoices using tenant name input
+        if tenant:
+                q = session.query(model).order_by(model.id).filter(model.tenant_name == tenant)
 
         # Fetch the invoice using invoice ID
         if invoice_id:
@@ -166,7 +170,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
 
         return [entry.to_cloudkitty() for entry in r]
 
-    # Invoice for non-admin tenanti
+    # Invoice for non-admin tenant
     # get the invoice for non-admin tenant
     # can be able to fetch using invoice-id and payment_status
     def get_invoice_for_tenant(self, tenant_name, invoice_id=None, payment_status=None):
