@@ -21,7 +21,9 @@ from sqlalchemy.ext import declarative
 from sqlalchemy import orm
 from sqlalchemy import schema
 
-Base = declarative.declarative_base()
+from cloudkitty.common.db import models as ck_models
+
+Base = ck_models.get_base()
 
 
 class HashMapBase(models.ModelBase):
@@ -62,32 +64,38 @@ class HashMapBase(models.ModelBase):
 
 
 class HashMapService(Base, HashMapBase):
-    """An hashmap service.
+    """A hashmap service.
 
+    Used to describe a CloudKitty service such as compute or volume.
     """
     __tablename__ = 'hashmap_services'
 
-    id = sqlalchemy.Column(sqlalchemy.Integer,
-                           primary_key=True)
-    service_id = sqlalchemy.Column(sqlalchemy.String(36),
-                                   nullable=False,
-                                   unique=True)
+    id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        primary_key=True)
+    service_id = sqlalchemy.Column(
+        sqlalchemy.String(36),
+        nullable=False,
+        unique=True)
     name = sqlalchemy.Column(
         sqlalchemy.String(255),
         nullable=False,
         unique=True)
-    fields = orm.relationship('HashMapField',
-                              backref=orm.backref(
-                                  'service',
-                                  lazy='immediate'))
-    mappings = orm.relationship('HashMapMapping',
-                                backref=orm.backref(
-                                    'service',
-                                    lazy='immediate'))
-    thresholds = orm.relationship('HashMapThreshold',
-                                  backref=orm.backref(
-                                      'service',
-                                      lazy='immediate'))
+    fields = orm.relationship(
+        'HashMapField',
+        backref=orm.backref(
+            'service',
+            lazy='immediate'))
+    mappings = orm.relationship(
+        'HashMapMapping',
+        backref=orm.backref(
+            'service',
+            lazy='immediate'))
+    thresholds = orm.relationship(
+        'HashMapThreshold',
+        backref=orm.backref(
+            'service',
+            lazy='immediate'))
 
     def __repr__(self):
         return ('<HashMapService[{uuid}]: '
@@ -97,41 +105,51 @@ class HashMapService(Base, HashMapBase):
 
 
 class HashMapField(Base, HashMapBase):
-    """An hashmap field.
+    """A hashmap field.
 
+    Used to describe a service metadata such as flavor_id or image_id for
+    compute.
     """
     __tablename__ = 'hashmap_fields'
-    fk_to_resolve = {'service_id': 'service.service_id'}
+    fk_to_resolve = {
+        'service_id': 'service.service_id'}
 
     @declarative.declared_attr
     def __table_args__(cls):
-        args = (schema.UniqueConstraint('field_id', 'name',
-                                        name='uniq_field'),
-                schema.UniqueConstraint('service_id', 'name',
-                                        name='uniq_map_service_field'),
-                HashMapBase.__table_args__,)
+        args = (
+            schema.UniqueConstraint(
+                'service_id',
+                'name',
+                name='uniq_field_per_service'),
+            HashMapBase.__table_args__,)
         return args
 
-    id = sqlalchemy.Column(sqlalchemy.Integer,
-                           primary_key=True)
-    field_id = sqlalchemy.Column(sqlalchemy.String(36),
-                                 nullable=False,
-                                 unique=True)
-    name = sqlalchemy.Column(sqlalchemy.String(255),
-                             nullable=False)
+    id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        primary_key=True)
+    field_id = sqlalchemy.Column(
+        sqlalchemy.String(36),
+        nullable=False,
+        unique=True)
+    name = sqlalchemy.Column(
+        sqlalchemy.String(255),
+        nullable=False)
     service_id = sqlalchemy.Column(
         sqlalchemy.Integer,
-        sqlalchemy.ForeignKey('hashmap_services.id',
-                              ondelete='CASCADE'),
+        sqlalchemy.ForeignKey(
+            'hashmap_services.id',
+            ondelete='CASCADE'),
         nullable=False)
-    mappings = orm.relationship('HashMapMapping',
-                                backref=orm.backref(
-                                    'field',
-                                    lazy='immediate'))
-    thresholds = orm.relationship('HashMapThreshold',
-                                  backref=orm.backref(
-                                      'field',
-                                      lazy='immediate'))
+    mappings = orm.relationship(
+        'HashMapMapping',
+        backref=orm.backref(
+            'field',
+            lazy='immediate'))
+    thresholds = orm.relationship(
+        'HashMapThreshold',
+        backref=orm.backref(
+            'field',
+            lazy='immediate'))
 
     def __repr__(self):
         return ('<HashMapField[{uuid}]: '
@@ -143,25 +161,31 @@ class HashMapField(Base, HashMapBase):
 class HashMapGroup(Base, HashMapBase):
     """A grouping of hashmap calculations.
 
+    Used to group multiple mappings or thresholds into a single calculation.
     """
     __tablename__ = 'hashmap_groups'
 
-    id = sqlalchemy.Column(sqlalchemy.Integer,
-                           primary_key=True)
-    group_id = sqlalchemy.Column(sqlalchemy.String(36),
-                                 nullable=False,
-                                 unique=True)
-    name = sqlalchemy.Column(sqlalchemy.String(255),
-                             nullable=False,
-                             unique=True)
-    mappings = orm.relationship('HashMapMapping',
-                                backref=orm.backref(
-                                    'group',
-                                    lazy='immediate'))
-    thresholds = orm.relationship('HashMapThreshold',
-                                  backref=orm.backref(
-                                      'group',
-                                      lazy='immediate'))
+    id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        primary_key=True)
+    group_id = sqlalchemy.Column(
+        sqlalchemy.String(36),
+        nullable=False,
+        unique=True)
+    name = sqlalchemy.Column(
+        sqlalchemy.String(255),
+        nullable=False,
+        unique=True)
+    mappings = orm.relationship(
+        'HashMapMapping',
+        backref=orm.backref(
+            'group',
+            lazy='immediate'))
+    thresholds = orm.relationship(
+        'HashMapThreshold',
+        backref=orm.backref(
+            'group',
+            lazy='immediate'))
 
     def __repr__(self):
         return ('<HashMapGroup[{uuid}]: '
@@ -171,106 +195,158 @@ class HashMapGroup(Base, HashMapBase):
 
 
 class HashMapMapping(Base, HashMapBase):
-    """A mapping between a field a value and a type.
+    """A mapping between a field or service, a value and a type.
 
+    Used to model final equation.
     """
-    __tablename__ = 'hashmap_maps'
-    fk_to_resolve = {'service_id': 'service.service_id',
-                     'field_id': 'field.field_id',
-                     'group_id': 'group.group_id'}
+    __tablename__ = 'hashmap_mappings'
+    fk_to_resolve = {
+        'service_id': 'service.service_id',
+        'field_id': 'field.field_id',
+        'group_id': 'group.group_id'}
 
     @declarative.declared_attr
     def __table_args__(cls):
-        args = (schema.UniqueConstraint('value', 'field_id',
-                                        name='uniq_field_mapping'),
-                schema.UniqueConstraint('value', 'service_id',
-                                        name='uniq_service_mapping'),
-                HashMapBase.__table_args__,)
+        args = (
+            schema.UniqueConstraint(
+                'value',
+                'field_id',
+                'tenant_id',
+                name='uniq_field_mapping'),
+            schema.UniqueConstraint(
+                'value',
+                'service_id',
+                'tenant_id',
+                name='uniq_service_mapping'),
+            HashMapBase.__table_args__,)
         return args
 
-    id = sqlalchemy.Column(sqlalchemy.Integer,
-                           primary_key=True)
-    mapping_id = sqlalchemy.Column(sqlalchemy.String(36),
-                                   nullable=False,
-                                   unique=True)
-    value = sqlalchemy.Column(sqlalchemy.String(255),
-                              nullable=True)
-    cost = sqlalchemy.Column(sqlalchemy.Numeric(20, 8),
-                             nullable=False)
-    map_type = sqlalchemy.Column(sqlalchemy.Enum('flat',
-                                                 'rate',
-                                                 name='enum_map_type'),
-                                 nullable=False)
-    service_id = sqlalchemy.Column(sqlalchemy.Integer,
-                                   sqlalchemy.ForeignKey('hashmap_services.id',
-                                                         ondelete='CASCADE'),
-                                   nullable=True)
-    field_id = sqlalchemy.Column(sqlalchemy.Integer,
-                                 sqlalchemy.ForeignKey('hashmap_fields.id',
-                                                       ondelete='CASCADE'),
-                                 nullable=True)
-    group_id = sqlalchemy.Column(sqlalchemy.Integer,
-                                 sqlalchemy.ForeignKey('hashmap_groups.id',
-                                                       ondelete='SET NULL'),
-                                 nullable=True)
+    id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        primary_key=True)
+    mapping_id = sqlalchemy.Column(
+        sqlalchemy.String(36),
+        nullable=False,
+        unique=True)
+    value = sqlalchemy.Column(
+        sqlalchemy.String(255),
+        nullable=True)
+    cost = sqlalchemy.Column(
+        sqlalchemy.Numeric(20, 8),
+        nullable=False)
+    map_type = sqlalchemy.Column(
+        sqlalchemy.Enum(
+            'flat',
+            'rate',
+            name='enum_map_type'),
+        nullable=False)
+    service_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            'hashmap_services.id',
+            ondelete='CASCADE'),
+        nullable=True)
+    field_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            'hashmap_fields.id',
+            ondelete='CASCADE'),
+        nullable=True)
+    group_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            'hashmap_groups.id',
+            ondelete='SET NULL'),
+        nullable=True)
+    tenant_id = sqlalchemy.Column(
+        sqlalchemy.String(36),
+        nullable=True)
 
     def __repr__(self):
         return ('<HashMapMapping[{uuid}]: '
-                'type={map_type} {value}={cost}>').format(
+                'type={map_type} {value}={cost}, '
+                'tenant={tenant}>').format(
                     uuid=self.mapping_id,
                     map_type=self.map_type,
                     value=self.value,
-                    cost=self.cost)
+                    cost=self.cost,
+                    tenant=self.tenant_id)
 
 
 class HashMapThreshold(Base, HashMapBase):
-    """A threshold matching a service, a field with a level and a type.
+    """A threshold matching a service or a field with a level and a type.
 
+    Used to model final equation.
     """
     __tablename__ = 'hashmap_thresholds'
-    fk_to_resolve = {'service_id': 'service.service_id',
-                     'field_id': 'field.field_id',
-                     'group_id': 'group.group_id'}
+    fk_to_resolve = {
+        'service_id': 'service.service_id',
+        'field_id': 'field.field_id',
+        'group_id': 'group.group_id'}
 
     @declarative.declared_attr
     def __table_args__(cls):
-        args = (schema.UniqueConstraint('level', 'field_id',
-                                        name='uniq_field_threshold'),
-                schema.UniqueConstraint('level', 'service_id',
-                                        name='uniq_service_threshold'),
-                HashMapBase.__table_args__,)
+        args = (
+            schema.UniqueConstraint(
+                'level',
+                'field_id',
+                'tenant_id',
+                name='uniq_field_threshold'),
+            schema.UniqueConstraint(
+                'level',
+                'service_id',
+                'tenant_id',
+                name='uniq_service_threshold'),
+            HashMapBase.__table_args__,)
         return args
 
-    id = sqlalchemy.Column(sqlalchemy.Integer,
-                           primary_key=True)
-    threshold_id = sqlalchemy.Column(sqlalchemy.String(36),
-                                     nullable=False,
-                                     unique=True)
-    level = sqlalchemy.Column(sqlalchemy.Numeric(20, 8),
-                              nullable=True)
-    cost = sqlalchemy.Column(sqlalchemy.Numeric(20, 8),
-                             nullable=False)
-    map_type = sqlalchemy.Column(sqlalchemy.Enum('flat',
-                                                 'rate',
-                                                 name='enum_map_type'),
-                                 nullable=False)
-    service_id = sqlalchemy.Column(sqlalchemy.Integer,
-                                   sqlalchemy.ForeignKey('hashmap_services.id',
-                                                         ondelete='CASCADE'),
-                                   nullable=True)
-    field_id = sqlalchemy.Column(sqlalchemy.Integer,
-                                 sqlalchemy.ForeignKey('hashmap_fields.id',
-                                                       ondelete='CASCADE'),
-                                 nullable=True)
-    group_id = sqlalchemy.Column(sqlalchemy.Integer,
-                                 sqlalchemy.ForeignKey('hashmap_groups.id',
-                                                       ondelete='SET NULL'),
-                                 nullable=True)
+    id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        primary_key=True)
+    threshold_id = sqlalchemy.Column(
+        sqlalchemy.String(36),
+        nullable=False,
+        unique=True)
+    level = sqlalchemy.Column(
+        sqlalchemy.Numeric(20, 8),
+        nullable=True)
+    cost = sqlalchemy.Column(
+        sqlalchemy.Numeric(20, 8),
+        nullable=False)
+    map_type = sqlalchemy.Column(
+        sqlalchemy.Enum(
+            'flat',
+            'rate',
+            name='enum_hashmap_type'),
+        nullable=False)
+    service_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            'hashmap_services.id',
+            ondelete='CASCADE'),
+        nullable=True)
+    field_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            'hashmap_fields.id',
+            ondelete='CASCADE'),
+        nullable=True)
+    group_id = sqlalchemy.Column(
+        sqlalchemy.Integer,
+        sqlalchemy.ForeignKey(
+            'hashmap_groups.id',
+            ondelete='SET NULL'),
+        nullable=True)
+    tenant_id = sqlalchemy.Column(
+        sqlalchemy.String(36),
+        nullable=True)
 
     def __repr__(self):
         return ('<HashMapThreshold[{uuid}]: '
-                'type={map_type} {level}={cost}>').format(
+                'type={map_type} {level}={cost}, '
+                'tenant={tenant}>').format(
                     uuid=self.threshold_id,
                     map_type=self.map_type,
                     level=self.level,
-                    cost=self.cost)
+                    cost=self.cost,
+                    tenant=self.tenant_id)

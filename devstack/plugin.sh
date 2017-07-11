@@ -3,7 +3,7 @@
 
 # To enable a minimal set of CloudKitty services:
 # - enable Ceilometer ;
-# - add the following to localrc:
+# - add the following to the [[local|localrc]] section in the local.conf file:
 #
 #     enable_service ck-api ck-proc
 #
@@ -48,15 +48,13 @@ fi
 function create_cloudkitty_accounts {
     create_service_user "cloudkitty"
 
-    if [[ "$KEYSTONE_CATALOG_BACKEND" = 'sql' ]]; then
-        local cloudkitty_service=$(get_or_create_service "cloudkitty" \
-            "rating" "OpenStack Rating")
-        get_or_create_endpoint $cloudkitty_service \
-            "$REGION_NAME" \
-            "$CLOUDKITTY_SERVICE_PROTOCOL://$CLOUDKITTY_SERVICE_HOSTPORT/" \
-            "$CLOUDKITTY_SERVICE_PROTOCOL://$CLOUDKITTY_SERVICE_HOSTPORT/" \
-            "$CLOUDKITTY_SERVICE_PROTOCOL://$CLOUDKITTY_SERVICE_HOSTPORT/"
-    fi
+    local cloudkitty_service=$(get_or_create_service "cloudkitty" \
+        "rating" "OpenStack Rating")
+    get_or_create_endpoint $cloudkitty_service \
+        "$REGION_NAME" \
+        "$CLOUDKITTY_SERVICE_PROTOCOL://$CLOUDKITTY_SERVICE_HOSTPORT/" \
+        "$CLOUDKITTY_SERVICE_PROTOCOL://$CLOUDKITTY_SERVICE_HOSTPORT/" \
+        "$CLOUDKITTY_SERVICE_PROTOCOL://$CLOUDKITTY_SERVICE_HOSTPORT/"
 
     # Create the rating role
     get_or_create_role "rating"
@@ -97,8 +95,9 @@ function configure_cloudkitty {
     sudo mkdir -m 755 -p $CLOUDKITTY_API_LOG_DIR
     sudo chown $STACK_USER $CLOUDKITTY_API_LOG_DIR
 
+    touch $CLOUDKITTY_CONF
+
     cp $CLOUDKITTY_DIR$CLOUDKITTY_CONF_DIR/policy.json $CLOUDKITTY_CONF_DIR
-    cp $CLOUDKITTY_DIR$CLOUDKITTY_CONF.sample $CLOUDKITTY_CONF
     cp $CLOUDKITTY_DIR$CLOUDKITTY_CONF_DIR/api_paste.ini $CLOUDKITTY_CONF_DIR
     iniset_rpc_backend cloudkitty $CLOUDKITTY_CONF DEFAULT
 
@@ -106,20 +105,25 @@ function configure_cloudkitty {
     iniset $CLOUDKITTY_CONF DEFAULT debug "$ENABLE_DEBUG_LOG_LEVEL"
 
     # auth
-    iniset $CLOUDKITTY_CONF authinfos auth_plugin v2password
-    iniset $CLOUDKITTY_CONF authinfos auth_url "$KEYSTONE_SERVICE_PROTOCOL://$KEYSTONE_SERVICE_HOST:5000/v2.0/"
+    iniset $CLOUDKITTY_CONF authinfos auth_type v3password
+    iniset $CLOUDKITTY_CONF authinfos auth_protocol http
+    iniset $CLOUDKITTY_CONF authinfos auth_url "$KEYSTONE_SERVICE_PROTOCOL://$KEYSTONE_SERVICE_HOST:5000/v3"
+    iniset $CLOUDKITTY_CONF authinfos identity_uri "$KEYSTONE_SERVICE_PROTOCOL://$KEYSTONE_SERVICE_HOST:5000/v3"
     iniset $CLOUDKITTY_CONF authinfos username cloudkitty
     iniset $CLOUDKITTY_CONF authinfos password $SERVICE_PASSWORD
+    iniset $CLOUDKITTY_CONF authinfos project_name $SERVICE_TENANT_NAME
     iniset $CLOUDKITTY_CONF authinfos tenant_name $SERVICE_TENANT_NAME
     iniset $CLOUDKITTY_CONF authinfos region_name $REGION_NAME
+    iniset $CLOUDKITTY_CONF authinfos user_domain_name default
+    iniset $CLOUDKITTY_CONF authinfos project_domain_name default
     iniset $CLOUDKITTY_CONF authinfos debug "$ENABLE_DEBUG_LOG_LEVEL"
 
     iniset $CLOUDKITTY_CONF keystone_fetcher auth_section authinfos
-
-    iniset $CLOUDKITTY_CONF ceilometer_collector auth_section authinfos
+    iniset $CLOUDKITTY_CONF keystone_fetcher keystone_version 3
 
     # collect
     iniset $CLOUDKITTY_CONF collect collector $CLOUDKITTY_COLLECTOR
+    iniset $CLOUDKITTY_CONF ${CLOUDKITTY_COLLECTOR}_collector auth_section authinfos
     iniset $CLOUDKITTY_CONF collect services $CLOUDKITTY_SERVICES
 
     # output
@@ -151,11 +155,10 @@ function create_cloudkitty_data_dir {
     # Create data dir
     sudo mkdir -p $CLOUDKITTY_DATA_DIR
     sudo chown $STACK_USER $CLOUDKITTY_DATA_DIR
-    rm -f $CLOUDKITTY_DATA_DIR/*
+    rm -rf $CLOUDKITTY_DATA_DIR/*
     # Create locks dir
     sudo mkdir -p $CLOUDKITTY_DATA_DIR/locks
     sudo chown $STACK_USER $CLOUDKITTY_DATA_DIR/locks
-    rm -f $CLOUDKITTY_DATA_DIR/locks/*
 }
 
 # init_cloudkitty() - Initialize CloudKitty database

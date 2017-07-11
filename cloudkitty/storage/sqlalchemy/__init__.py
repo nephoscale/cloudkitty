@@ -35,6 +35,14 @@ import sqlalchemy.orm.interfaces
 import sqlalchemy.exc
 import datetime
 
+class DecimalJSONEncoder(json.JSONEncoder):
+    """Wrapper class to handle decimal.Decimal objects in json.dumps()."""
+    def default(self, obj):
+        if isinstance(obj, decimal.Decimal):
+            return float(obj)
+        return super(DecimalJSONEncoder, self).default(obj)
+
+
 class SQLAlchemyStorage(storage.BaseStorage):
     """SQLAlchemy Storage Backend
 
@@ -90,6 +98,56 @@ class SQLAlchemyStorage(storage.BaseStorage):
         if r:
             return ck_utils.dt2ts(r.begin)
 
+    """
+    def get_total(self, begin=None, end=None, tenant_id=None,
+                  service=None, groupby=None):
+        session = db.get_session()
+        querymodels = [
+            sqlalchemy.func.sum(self.frame_model.rate).label('rate')
+        ]
+
+        # Boundary calculation
+        if not begin:
+            begin = ck_utils.get_month_start()
+        if not end:
+            end = ck_utils.get_next_month()
+        if tenant_id:
+            querymodels.append(self.frame_model.tenant_id)
+        if service:
+            querymodels.append(self.frame_model.res_type)
+        if groupby:
+            groupbyfields = groupby.split(",")
+            for field in groupbyfields:
+                field_obj = self.frame_model.__dict__.get(field, None)
+                if field_obj and field_obj not in querymodels:
+                    querymodels.append(field_obj)
+
+        q = session.query(*querymodels)
+        if tenant_id:
+            q = q.filter(
+                self.frame_model.tenant_id == tenant_id)
+        if service:
+            q = q.filter(
+                self.frame_model.res_type == service)
+        q = q.filter(
+            self.frame_model.begin >= begin,
+            self.frame_model.end <= end,
+            self.frame_model.res_type != '_NO_DATA_')
+        if groupby:
+            q = q.group_by(groupby)
+
+        # Order by sum(rate)
+        q = q.order_by(sqlalchemy.func.sum(self.frame_model.rate))
+        results = q.all()
+        totallist = []
+        for r in results:
+            total = {model.name: value for model, value in zip(querymodels, r)}
+            total["begin"] = begin
+            total["end"] = end
+            totallist.append(total)
+        return totallist
+    """
+
     # Modified by Muralidharan.s for applying a logic for getting 
     # Total value based on Instance
     def get_total(self, begin=None, end=None, tenant_id=None, service=None, instance_id=None):
@@ -119,8 +177,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
             model.end <= end)
         rate = q.scalar()
         return rate
-
-
+    
     # For listing invoice
     # admin and non-admin tenant will be able to list the own invoice
     # only admin tenant will be able to get the invoice of all tenant (--all-tenants)
@@ -169,7 +226,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
         r = q.all()
 
         return [entry.to_cloudkitty() for entry in r]
-
+ 
     # Invoice for non-admin tenant
     # get the invoice for non-admin tenant
     # can be able to fetch using invoice-id and payment_status
@@ -207,6 +264,18 @@ class SQLAlchemyStorage(storage.BaseStorage):
 
         return [entry.to_cloudkitty() for entry in r]
 
+    def get_tenants(self, begin, end):
+        session = db.get_session()
+        q = utils.model_query(
+            self.frame_model,
+            session)
+        q = q.filter(
+            self.frame_model.begin >= begin,
+            self.frame_model.end <= end)
+        tenants = q.distinct().values(
+            self.frame_model.tenant_id)
+        return [tenant.tenant_id for tenant in tenants]
+
     # For showing a invoice details as needed
     # non-admin tenant section
     def show_invoice(self, invoice_id):
@@ -243,7 +312,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
                                         total_cost = total_cost,
                                         paid_cost = paid_cost,
                                         balance_cost = balance_cost,
-                                        payment_status = payment_status) 
+                                        payment_status = payment_status)
 
         try:
             with session.begin():
@@ -297,8 +366,8 @@ class SQLAlchemyStorage(storage.BaseStorage):
            if paid_cost:
                 invoice_detail['paid_cost'] = invoice_details.paid_cost
            if payment_status:
-                invoice_detail['payment_status'] = invoice_details.payment_status 
-           return invoice_detail
+                invoice_detail['payment_status'] = invoice_details.payment_status
+	   return invoice_detail
 
     # delete invoice entries in table
     def delete_invoice(self, invoice_id):
@@ -317,56 +386,6 @@ class SQLAlchemyStorage(storage.BaseStorage):
             except sqlalchemy.orm.exc.NoResultFound:
                 invoice_deleted = None
 
-    def get_tenants(self, begin=None, end=None):
-        # Boundary calculation
-        if not begin:
-            begin = ck_utils.get_month_start()
-        if not end:
-            end = ck_utils.get_next_month()
-
-        session = db.get_session()
-        q = utils.model_query(
-            self.frame_model,
-            session)
-        q = q.filter(
-            self.frame_model.begin >= begin,
-            self.frame_model.end <= end)
-        tenants = q.distinct().values(
-            self.frame_model.tenant_id)
-        return [tenant.tenant_id for tenant in tenants]
-
-    def add_time_frame_custom(self, **kwargs):
-        """Create a new time frame custom .
-
-        :param begin: Start of the dataframe.
-        :param end: End of the dataframe.
-        :param tenant_id: tenant_id of the dataframe owner.
-        :param unit: Unit of the metric.
-        :param qty: Quantity of the metric.
-        :param res_type: Type of the resource.
-        :param rate: Calculated rate for this dataframe.
-        :param desc: Resource description (metadata).
-        """
-
-        session = db.get_session()
-
-        # Add invoice details
-        frame = models.RatedDataFrame(  
-                                        begin = kwargs.get('begin'),
-                                        end = kwargs.get('end'),
-                                        tenant_id = kwargs.get('tenant_id'),
-                                        unit = kwargs.get('unit'),
-                                        qty = kwargs.get('qty'),
-                                        res_type = kwargs.get('res_type'),
-                                        rate = decimal.Decimal(kwargs.get('rate')),
-                                        desc = json.dumps(kwargs.get('desc')))
-
-        try:
-            with session.begin():
-                session.add(frame)
-
-        except sqlalchemy.exc.IntegrityError as exc:
-                reason = exc.message
 
     def get_time_frame(self, begin, end, **filters):
         session = db.get_session()
@@ -396,7 +415,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
         rate = rating_dict.get('price')
         if not rate:
             rate = decimal.Decimal(0)
-        desc = json.dumps(frame['desc'])
+        desc = json.dumps(frame['desc'], cls=DecimalJSONEncoder)
         self.add_time_frame(begin=self.usage_start_dt.get(tenant_id),
                             end=self.usage_end_dt.get(tenant_id),
                             tenant_id=tenant_id,

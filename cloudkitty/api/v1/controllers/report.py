@@ -23,7 +23,9 @@ from pecan import rest
 from wsme import types as wtypes
 import wsmeext.pecan as wsme_pecan
 
+from cloudkitty.api.v1.datamodels import report as report_models
 from cloudkitty.common import policy
+from cloudkitty import utils as ck_utils
 
 
 class ReportController(rest.RestController):
@@ -40,6 +42,7 @@ class ReportController(rest.RestController):
         'update_invoice': ['PUT'],
         'show_invoice': ['GET'],
         'delete_invoice': ['DELETE'],
+        'summary': ['GET']
     }
 
     @wsme_pecan.wsexpose([wtypes.text],
@@ -50,6 +53,12 @@ class ReportController(rest.RestController):
 
         """
         policy.enforce(pecan.request.context, 'report:list_tenants', {})
+
+        if not begin:
+            begin = ck_utils.get_month_start()
+        if not end:
+            end = ck_utils.get_next_month()
+
         storage = pecan.request.storage_backend
         tenants = storage.get_tenants(begin, end)
         return tenants
@@ -60,19 +69,33 @@ class ReportController(rest.RestController):
                          wtypes.text,
                          wtypes.text,
                          wtypes.text)
-
-    # Modified by Muralidharan.s for applying a logic for getting 
-    # Total value based on Instance
     def total(self, begin=None, end=None, tenant_id=None, service=None, instance_id=None):
         """Return the amount to pay for a given period.
 
         """
+	"""
+        if not begin:
+            begin = ck_utils.get_month_start()
+        if not end:
+            end = ck_utils.get_next_month()
+
+        if all_tenants:
+            tenant_id = None
+        else:
+            tenant_context = pecan.request.context.tenant
+            tenant_id = tenant_context if not tenant_id else tenant_id
+	"""
         policy.enforce(pecan.request.context, 'report:get_total', {})
+
         storage = pecan.request.storage_backend
         # FIXME(sheeprine): We should filter on user id.
         # Use keystone token information by default but make it overridable and
         # enforce it by policy engine
         total = storage.get_total(begin, end, tenant_id, service, instance_id)
+
+        # TODO(Aaron): `get_total` return a list of dict,
+        # Get value of rate from index[0]
+        #total = total[0].get('rate', decimal.Decimal('0'))
         return total if total else decimal.Decimal('0')
 
     # For getting the invoice for admin and non-admin tenants
@@ -87,49 +110,49 @@ class ReportController(rest.RestController):
         """Return the Invoice details.
 
         """
+        print "-------------------------invoice----------------- /opt/stack/cloudkitty/cloudkitty/api/v1/controllers/report.py"
+        # assigning a tenant_name to another variable tenant
+        # We already have variable named tenant for making decision on type of user and actions
+        # So assigning a new name as tenant
+        tenant = tenant_name
 
-	# assigning a tenant_name to another variable tenant
-	# We already have variable named tenant for making decision on type of user and actions
-	# So assigning a new name as tenant
-	tenant = tenant_name
-
+        print "------------------1--------------------"
         policy.enforce(pecan.request.context, 'report:invoice', {})
         storage = pecan.request.storage_backend
-
+        print "--------------2-----------------"
         # role of tenant
         roles = pecan.request.context.__dict__['roles']
-
+        print "------------------3----------------"
         # fetch tenant name
-        tenant_name = pecan.request.context.__dict__['tenant']
-
+        print pecan.request.context.__dict__
+        tenant_name = pecan.request.context.__dict__['project_name']
+        print "------------------4------------------"
         # If tenant_id or invoice_id or payment_status exists
         if tenant_id or invoice_id or payment_status or tenant_name:
 
-                # if admin role
-                if 'admin' in roles:
+            # if admin role
+            if 'admin' in roles:
 
-			# added facility for fetch using tenant name from user input also
-                        invoice = storage.get_invoice(tenant_id, tenant, invoice_id, payment_status)
+                # added facility for fetch using tenant name from user input also
+                invoice = storage.get_invoice(tenant_id, tenant, invoice_id, payment_status)
 
-                # for non-admin roles
+            # for non-admin roles
+            else:
+
+                # for restricting non-admin users to use tenant-name and tenant-id options
+                if not (tenant or tenant_id):
+
+                    # Added facility for fetch using tenant name too
+                    invoice = storage.get_invoice_for_tenant(tenant_name, invoice_id, payment_status)
+
+                # for generating a warning message if tenant_id arg passed for non-admin
                 else:
 
-                        # for restricting non-admin users to use tenant-name and tenant-id options
-                        if not (tenant or tenant_id):
+                    pecan.abort(405, six.text_type())
 
-				# Added facility for fetch using tenant name too
-                                invoice = storage.get_invoice_for_tenant(tenant_name, invoice_id, payment_status)
-
-                        # for generating a warning message if tenant_id arg passed for non-admin
-                        else:
-
-                                pecan.abort(405, six.text_type())
-
-        # for generating the warning message that invoice-get not supported
+                    # for generating the warning message that invoice-get not supported
         else:
-
-                pecan.abort(405, six.text_type())
-
+            pecan.abort(405, six.text_type())
 
         return invoice
 
@@ -143,13 +166,14 @@ class ReportController(rest.RestController):
         """Return the Invoice details.
 
         """
+        print "-----------------------in list_invoice======="
         policy.enforce(pecan.request.context, 'report:list_invoice', {})
         storage = pecan.request.storage_backend
         # Fetch the user role
         roles = pecan.request.context.__dict__['roles']
 
         # fetch tenant name
-        tenant_name = pecan.request.context.__dict__['tenant']
+        tenant_name = pecan.request.context.__dict__['project_name']
 
         # for admin tenant
         if 'admin' in roles:
@@ -183,7 +207,7 @@ class ReportController(rest.RestController):
         roles = pecan.request.context.__dict__['roles']
 
         # fetch tenant name
-        tenant_name = pecan.request.context.__dict__['tenant']
+        tenant_name = pecan.request.context.__dict__['project_name']
 
         # for admin tenant
         if 'admin' in roles:
@@ -294,3 +318,38 @@ class ReportController(rest.RestController):
 
                 # invoice details
                 invoice = storage.delete_invoice(invoice_id)
+
+    @wsme_pecan.wsexpose(report_models.SummaryCollectionModel,
+                         datetime.datetime,
+                         datetime.datetime,
+                         wtypes.text,
+                         wtypes.text,
+                         wtypes.text,
+                         bool)
+    def summary(self, begin=None, end=None, tenant_id=None,
+                service=None, groupby=None, all_tenants=False):
+        """Return the summary to pay for a given period.
+
+        """
+        if not begin:
+            begin = ck_utils.get_month_start()
+        if not end:
+            end = ck_utils.get_next_month()
+
+        if all_tenants:
+            tenant_id = None
+        else:
+            tenant_context = pecan.request.context.tenant
+            tenant_id = tenant_context if not tenant_id else tenant_id
+        policy.enforce(pecan.request.context, 'report:get_summary',
+                       {"tenant_id": tenant_id})
+        storage = pecan.request.storage_backend
+
+        summarymodels = []
+        results = storage.get_total(begin, end, tenant_id, service,
+                                    groupby=groupby)
+        for result in results:
+            summarymodel = report_models.SummaryModel(**result)
+            summarymodels.append(summarymodel)
+
+        return report_models.SummaryCollectionModel(summary=summarymodels)

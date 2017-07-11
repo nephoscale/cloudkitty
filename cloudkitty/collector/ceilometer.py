@@ -15,14 +15,21 @@
 #
 # @author: Stéphane Albert
 #
+import decimal
+
 from ceilometerclient import client as cclient
 from keystoneauth1 import loading as ks_loading
 from oslo_config import cfg
+from oslo_utils import units
 
 from cloudkitty import collector
 from cloudkitty import utils as ck_utils
 
+
 CEILOMETER_COLLECTOR_OPTS = 'ceilometer_collector'
+ceilometer_collector_opts = ks_loading.get_auth_common_conf_options()
+
+cfg.CONF.register_opts(ceilometer_collector_opts, CEILOMETER_COLLECTOR_OPTS)
 ks_loading.register_session_conf_options(
     cfg.CONF,
     CEILOMETER_COLLECTOR_OPTS)
@@ -71,6 +78,15 @@ class CeilometerCollector(collector.BaseCollector):
     dependencies = ('CeilometerTransformer',
                     'CloudKittyFormatTransformer')
 
+    units_mappings = {
+        'compute': 'instance',
+        'image': 'MB',
+        'volume': 'GB',
+        'network.bw.out': 'MB',
+        'network.bw.in': 'MB',
+        'network.floating': 'ip',
+    }
+
     def __init__(self, transformers, **kwargs):
         super(CeilometerCollector, self).__init__(transformers, **kwargs)
 
@@ -89,6 +105,18 @@ class CeilometerCollector(collector.BaseCollector):
         self._conn = cclient.get_client(
             '2',
             session=self.session)
+
+    @classmethod
+    def get_metadata(cls, resource_name, transformers):
+        info = super(CeilometerCollector, cls).get_metadata(resource_name,
+                                                            transformers)
+        try:
+            info["metadata"].extend(transformers['CeilometerTransformer']
+                                    .get_metadata(resource_name))
+            info["unit"] = cls.units_mappings[resource_name]
+        except KeyError:
+            pass
+        return info
 
     def gen_filter(self, op='eq', **kwargs):
         """Generate ceilometer filter from kwargs."""
@@ -160,7 +188,7 @@ class CeilometerCollector(collector.BaseCollector):
                 for resource in resources_stats]
 
     def get_compute(self, start, end=None, project_id=None, q_filter=None):
-        active_instance_ids = self.active_resources('instance', start, end,
+        active_instance_ids = self.active_resources('cpu', start, end,
                                                     project_id, q_filter)
         compute_data = []
         for instance_id in active_instance_ids:
@@ -173,9 +201,9 @@ class CeilometerCollector(collector.BaseCollector):
                                                  instance)
             instance = self._cacher.get_resource_detail('compute',
                                                         instance_id)
-            compute_data.append(self.t_cloudkitty.format_item(instance,
-                                                              'instance',
-                                                              1))
+            compute_data.append(
+                self.t_cloudkitty.format_item(instance, self.units_mappings[
+                    "compute"], 1))
         if not compute_data:
             raise collector.NoDataCollected(self.collector_name, 'compute')
         return self.t_cloudkitty.format_service('compute', compute_data)
@@ -199,11 +227,10 @@ class CeilometerCollector(collector.BaseCollector):
             image = self._cacher.get_resource_detail('image',
                                                      image_id)
 
-            # Convert bytes to GB for rate calculation
-            image_size_gb = image_stats.max / 1073741824.0
-            image_data.append(self.t_cloudkitty.format_item(image,
-                                                            'GB',
-                                                            image_size_gb))
+            image_size_mb = decimal.Decimal(image_stats.max) / units.Mi
+            image_data.append(
+                self.t_cloudkitty.format_item(image, self.units_mappings[
+                    "image"], image_size_mb))
 
         if not image_data:
             raise collector.NoDataCollected(self.collector_name, 'image')
@@ -228,9 +255,9 @@ class CeilometerCollector(collector.BaseCollector):
                                                  volume)
             volume = self._cacher.get_resource_detail('volume',
                                                       volume_id)
-            volume_data.append(self.t_cloudkitty.format_item(volume,
-                                                             'GB',
-                                                             volume_stats.max))
+            volume_data.append(
+                self.t_cloudkitty.format_item(volume, self.units_mappings[
+                    "volume"], volume_stats.max))
         if not volume_data:
             raise collector.NoDataCollected(self.collector_name, 'volume')
         return self.t_cloudkitty.format_service('volume', volume_data)
@@ -265,10 +292,12 @@ class CeilometerCollector(collector.BaseCollector):
                                                  tap)
             tap = self._cacher.get_resource_detail('network.tap',
                                                    tap_id)
-            tap_bw_mb = tap_stat.max / 1048576.0
-            bw_data.append(self.t_cloudkitty.format_item(tap,
-                                                         'MB',
-                                                         tap_bw_mb))
+
+            tap_bw_mb = decimal.Decimal(tap_stat.max) / units.M
+            bw_data.append(
+                self.t_cloudkitty.format_item(tap, self.units_mappings[
+                    "network.bw." + direction], tap_bw_mb))
+
         ck_res_name = 'network.bw.{}'.format(direction)
         if not bw_data:
             raise collector.NoDataCollected(self.collector_name,
@@ -313,76 +342,11 @@ class CeilometerCollector(collector.BaseCollector):
                                                  floating)
             floating = self._cacher.get_resource_detail('network.floating',
                                                         floating_id)
-            floating_data.append(self.t_cloudkitty.format_item(floating,
-                                                               'ip',
-                                                               1))
+            floating_data.append(
+                self.t_cloudkitty.format_item(floating, self.units_mappings[
+                    "network.floating"], 1))
         if not floating_data:
             raise collector.NoDataCollected(self.collector_name,
                                             'network.floating')
         return self.t_cloudkitty.format_service('network.floating',
                                                 floating_data)
-
-    def get_cloudstorage(self, start, end=None, project_id=None, q_filter=None):
-
-        # To bill in each and every period
-        active_cloud_volume_stats = self.resources_stats('storage.objects.size',
-                                                   start,
-                                                   end,
-                                                   project_id,
-                                                   q_filter)
-        cloud_volume_data = []
-
-        for cloud_volume_stats in active_cloud_volume_stats:
-
-            cloud_volume_id = cloud_volume_stats.groupby['resource_id']
-            if not self._cacher.has_resource_detail('cloudstorage',
-                                                    cloud_volume_id):
-                raw_resource = self._conn.resources.get(cloud_volume_id)
-
-                cloud_volume = self.t_ceilometer.strip_resource_data('cloudstorage',
-                                                               raw_resource)
-
-                self._cacher.add_resource_detail('cloudstorage',
-                                                 cloud_volume_id,
-                                                 cloud_volume)
-
-            cloud_volume = self._cacher.get_resource_detail('cloudstorage',
-                                                      cloud_volume_id)
-
-            # Convert bytes to GB
-            cloud_volume_gb = cloud_volume_stats.max / 1073741824.0
-
-            cloud_volume_data.append(self.t_cloudkitty.format_item(cloud_volume,
-                                                             'GB',
-                                                             cloud_volume_gb))
-
-        if not cloud_volume_data:
-            raise collector.NoDataCollected(self.collector_name, 'cloudstorage')
-        return self.t_cloudkitty.format_service('cloudstorage', cloud_volume_data)
-
-
-    # For enabling instance based add-on rates
-    def get_instance_addon(self, start, end=None, project_id=None, q_filter=None):
-        active_instance_ids = self.active_resources('instance', start, end,
-                                                    project_id, q_filter)
-
-        instance_addon_data = []
-        for instance_id in active_instance_ids:
-            if not self._cacher.has_resource_detail('instance.addon', instance_id):
-                raw_resource = self._conn.resources.get(instance_id)
-
-                instance_addon = self.t_ceilometer.strip_resource_data('instance.addon',
-                                                                 raw_resource)
-                self._cacher.add_resource_detail('instance.addon',
-                                                 instance_id,
-                                                 instance_addon)
-            instance_addon = self._cacher.get_resource_detail('instance.addon',
-                                                        instance_id)
-
-            instance_addon_data.append(self.t_cloudkitty.format_item(instance_addon,
-                                                              'instance.addon',
-                                                              1))
-
-        if not instance_addon_data:
-            raise collector.NoDataCollected(self.collector_name, 'instance.addon')
-        return self.t_cloudkitty.format_service('instance.addon', instance_addon_data)

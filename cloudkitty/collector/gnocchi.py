@@ -13,13 +13,20 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 #
+import decimal
+
 from gnocchiclient import client as gclient
 from keystoneauth1 import loading as ks_loading
 from oslo_config import cfg
+from oslo_utils import units
 
 from cloudkitty import collector
+from cloudkitty import utils as ck_utils
 
 GNOCCHI_COLLECTOR_OPTS = 'gnocchi_collector'
+gnocchi_collector_opts = ks_loading.get_auth_common_conf_options()
+
+cfg.CONF.register_opts(gnocchi_collector_opts, GNOCCHI_COLLECTOR_OPTS)
 ks_loading.register_session_conf_options(
     cfg.CONF,
     GNOCCHI_COLLECTOR_OPTS)
@@ -39,6 +46,7 @@ class GnocchiCollector(collector.BaseCollector):
         'volume': 'volume',
         'network.bw.out': 'instance_network_interface',
         'network.bw.in': 'instance_network_interface',
+        'network.floating': 'network',
     }
     metrics_mappings = {
         'compute': [
@@ -57,14 +65,18 @@ class GnocchiCollector(collector.BaseCollector):
             ('network.outgoing.bytes', 'max')],
         'network.bw.in': [
             ('network.incoming.bytes', 'max')],
+        'network.floating': [
+            ('ip.floating', 'max')],
     }
-    volumes_mappings = {
+    units_mappings = {
         'compute': (1, 'instance'),
         'image': ('image.size', 'MB'),
         'volume': ('volume.size', 'GB'),
         'network.bw.out': ('network.outgoing.bytes', 'MB'),
         'network.bw.in': ('network.incoming.bytes', 'MB'),
+        'network.floating': ('ip.floating', 'ip'),
     }
+    default_unit = (1, 'unknown')
 
     def __init__(self, transformers, **kwargs):
         super(GnocchiCollector, self).__init__(transformers, **kwargs)
@@ -82,6 +94,18 @@ class GnocchiCollector(collector.BaseCollector):
         self._conn = gclient.Client(
             '1',
             session=self.session)
+
+    @classmethod
+    def get_metadata(cls, resource_name, transformers):
+        info = super(GnocchiCollector, cls).get_metadata(resource_name,
+                                                         transformers)
+        try:
+            info["metadata"].extend(transformers['GnocchiTransformer']
+                                    .get_metadata(resource_name))
+            info["unit"] = cls.units_mappings[resource_name][1]
+        except KeyError:
+            pass
+        return info
 
     @classmethod
     def gen_filter(cls, cop='=', lop='and', **kwargs):
@@ -116,159 +140,107 @@ class GnocchiCollector(collector.BaseCollector):
         else:
             return filter_list[0] if len(filter_list) else {}
 
-    def _generate_time_filter(self, start, end=None, with_revision=False):
+    def _generate_time_filter(self, start, end):
         """Generate timeframe filter.
 
         :param start: Start of the timeframe.
         :param end: End of the timeframe if needed.
-        :param with_revision: Filter on the resource revision.
-        :type with_revision: bool
         """
         time_filter = list()
         time_filter.append(self.extend_filter(
             self.gen_filter(ended_at=None),
             self.gen_filter(cop=">=", ended_at=start),
             lop='or'))
-        if end:
-            time_filter.append(self.extend_filter(
-                self.gen_filter(ended_at=None),
-                self.gen_filter(cop="<=", ended_at=end),
-                lop='or'))
-            time_filter.append(
-                self.gen_filter(cop="<=", started_at=end))
-            if with_revision:
-                time_filter.append(
-                    self.gen_filter(cop="<=", revision_start=end))
+        time_filter.append(
+            self.gen_filter(cop="<=", started_at=end))
         return time_filter
 
-    def _expand_metrics(self, resources, mappings, start, end=None):
+    def _expand_metrics(self, resources, mappings, start, end):
         for resource in resources:
             metrics = resource.get('metrics', {})
             for name, aggregate in mappings:
-                value = self._conn.metric.get_measures(
-                    metric=metrics.get(name),
-                    start=start,
-                    stop=end,
-                    aggregation=aggregate)
                 try:
-                    resource[name] = value[0][2]
+                    values = self._conn.metric.get_measures(
+                        metric=metrics[name],
+                        start=ck_utils.ts2dt(start),
+                        stop=ck_utils.ts2dt(end),
+                        aggregation=aggregate)
+                    # NOTE(sheeprine): Get the list of values for the current
+                    # metric and get the first result value.
+                    # [point_date, granularity, value]
+                    # ["2015-11-24T00:00:00+00:00", 86400.0, 64.0]
+                    resource[name] = values[0][2]
                 except IndexError:
-                    resource[name] = None
+                    resource[name] = 0
+                except KeyError:
+                    # Skip metrics not found
+                    pass
 
-    def resource_info(self,
-                      resource_type,
-                      start,
-                      end=None,
-                      resource_id=None,
-                      project_id=None,
-                      q_filter=None):
+    def get_resources(self, resource_name, start, end,
+                      project_id, q_filter=None):
         """Get resources during the timeframe.
 
-        Set the resource_id if you want to get a specific resource.
-        :param resource_type: Resource type to filter on.
-        :type resource_type: str
+        :param resource_name: Resource name to filter on.
+        :type resource_name: str
         :param start: Start of the timeframe.
         :param end: End of the timeframe if needed.
-        :param resource_id: Retrieve a specific resource based on its id.
-        :type resource_id: str
         :param project_id: Filter on a specific tenant/project.
         :type project_id: str
         :param q_filter: Append a custom filter.
         :type q_filter: list
         """
-        # Translating to resource name if needed
-        translated_resource = self.retrieve_mappings.get(resource_type,
-                                                         resource_type)
-        qty, unit = self.volumes_mappings.get(
-            resource_type,
-            (1, 'unknown'))
-        # NOTE(sheeprine): Only filter revision on resource retrieval
-        query_parameters = self._generate_time_filter(
-            start,
-            end,
-            True if resource_id else False)
-        need_subquery = True
-        if resource_id:
-            need_subquery = False
-            query_parameters.append(
-                self.gen_filter(id=resource_id))
-            resources = self._conn.resource.search(
-                resource_type=translated_resource,
-                query=self.extend_filter(*query_parameters),
-                history=True,
-                limit=1,
-                sorts=['revision_start:desc'])
-        else:
-            if end:
-                query_parameters.append(
-                    self.gen_filter(cop="=", type=translated_resource))
-            else:
-                need_subquery = False
-            if project_id:
-                query_parameters.append(
-                    self.gen_filter(project_id=project_id))
-            if q_filter:
-                query_parameters.append(q_filter)
-            final_query = self.extend_filter(*query_parameters)
-            resources = self._conn.resource.search(
-                resource_type='generic' if end else translated_resource,
-                query=final_query)
-        resource_list = list()
-        if not need_subquery:
-            for resource in resources:
-                resource_data = self.t_gnocchi.strip_resource_data(
-                    resource_type,
-                    resource)
-                self._expand_metrics(
-                    [resource_data],
-                    self.metrics_mappings[resource_type],
-                    start,
-                    end)
-                resource_data.pop('metrics', None)
-                data = self.t_cloudkitty.format_item(
-                    resource_data,
-                    unit,
-                    qty if isinstance(qty, int) else resource_data[qty])
-                resource_list.append(data)
-            return resource_list[0] if resource_id else resource_list
-        for resource in resources:
-            res = self.resource_info(
-                resource_type,
-                start,
-                end,
-                resource_id=resource.get('id', ''))
-            resource_list.append(res)
-        return resource_list
+        # NOTE(sheeprine): We first get the list of every resource running
+        # without any details or history.
+        # Then we get information about the resource getting details and
+        # history.
 
-    def generic_retrieve(self,
-                         resource_name,
-                         start,
-                         end=None,
-                         project_id=None,
-                         q_filter=None):
-        resources = self.resource_info(
-            resource_name,
-            start,
-            end,
-            project_id,
-            q_filter)
+        # Translating the resource name if needed
+        query_parameters = self._generate_time_filter(start, end)
+        resource_type = self.retrieve_mappings.get(resource_name)
+        query_parameters.append(
+            self.gen_filter(cop="=", type=resource_type))
+        query_parameters.append(
+            self.gen_filter(project_id=project_id))
+        if q_filter:
+            query_parameters.append(q_filter)
+        resources = self._conn.resource.search(
+            resource_type=resource_type,
+            query=self.extend_filter(*query_parameters))
+        return resources
+
+    def resource_info(self, resource_name, start, end, project_id,
+                      q_filter=None):
+        qty, unit = self.units_mappings.get(resource_name, self.default_unit)
+        resources = self.get_resources(resource_name, start, end,
+                                       project_id=project_id,
+                                       q_filter=q_filter)
+        formated_resources = list()
+        for resource in resources:
+            resource_data = self.t_gnocchi.strip_resource_data(
+                resource_name, resource)
+            mappings = self.metrics_mappings[resource_name]
+            self._expand_metrics([resource_data], mappings, start, end)
+            resource_data.pop('metrics', None)
+            # Convert network.bw.in, network.bw.out and image unit to MB
+            if resource.get('type') == 'instance_network_interface':
+                resource_data[qty] = (
+                    decimal.Decimal(resource_data[qty]) / units.M)
+            elif resource.get('type') == 'image':
+                resource_data[qty] = (
+                    decimal.Decimal(resource_data[qty]) / units.Mi)
+            data = self.t_cloudkitty.format_item(
+                resource_data, unit,
+                decimal.Decimal(
+                    qty if isinstance(qty, int) else resource_data[qty]))
+            # NOTE(sheeprine): Reference to gnocchi resource used by storage
+            data['resource_id'] = data['desc']['resource_id']
+            formated_resources.append(data)
+        return formated_resources
+
+    def retrieve(self, resource_name, start, end, project_id, q_filter=None):
+        resources = self.resource_info(resource_name, start, end,
+                                       project_id=project_id,
+                                       q_filter=q_filter)
         if not resources:
             raise collector.NoDataCollected(self.collector_name, resource_name)
-        for resource in resources:
-            # NOTE(sheeprine): Reference to gnocchi resource used by storage
-            resource['resource_id'] = resource['desc']['resource_id']
         return self.t_cloudkitty.format_service(resource_name, resources)
-
-    def retrieve(self,
-                 resource,
-                 start,
-                 end=None,
-                 project_id=None,
-                 q_filter=None):
-        trans_resource = resource.replace('_', '.')
-        return self.generic_retrieve(
-            trans_resource,
-            start,
-            end,
-            project_id,
-            q_filter)

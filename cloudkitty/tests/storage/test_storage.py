@@ -17,18 +17,14 @@
 #
 import copy
 
-import mock
-import six
 import sqlalchemy
 import testscenarios
-
-try: import simplejson as json
-except ImportError: import json
 
 from cloudkitty import storage
 from cloudkitty import tests
 from cloudkitty.tests import samples
 from cloudkitty import utils as ck_utils
+
 
 class StorageTest(tests.TestCase):
     storage_scenarios = [
@@ -122,7 +118,7 @@ class StorageTest(tests.TestCase):
     def test_send_nodata_between_data(self):
         working_data = copy.deepcopy(samples.RATED_DATA)
         for period in working_data:
-            for service, data in sorted(six.iteritems(period['usage'])):
+            for service, data in sorted(period['usage'].items()):
                 sub_data = [{
                     'period': period['period'],
                     'usage': {
@@ -301,50 +297,135 @@ class StorageTest(tests.TestCase):
 
     # Total
     def test_get_empty_total(self):
+        begin = ck_utils.ts2dt(samples.FIRST_PERIOD_BEGIN - 3600)
+        end = ck_utils.ts2dt(samples.FIRST_PERIOD_BEGIN)
         self.insert_data()
         total = self.storage.get_total(
-            begin=ck_utils.ts2dt(samples.FIRST_PERIOD_BEGIN - 3600),
-            end=ck_utils.ts2dt(samples.FIRST_PERIOD_BEGIN))
-        self.assertIsNone(total)
+            begin=begin,
+            end=end)
+        self.assertEqual(1, len(total))
+        self.assertIsNone(total[0]["rate"])
+        self.assertEqual(begin, total[0]["begin"])
+        self.assertEqual(end, total[0]["end"])
 
     def test_get_total_without_filter_but_timestamp(self):
+        begin = ck_utils.ts2dt(samples.FIRST_PERIOD_BEGIN)
+        end = ck_utils.ts2dt(samples.SECOND_PERIOD_END)
         self.insert_data()
         total = self.storage.get_total(
-            begin=ck_utils.ts2dt(samples.FIRST_PERIOD_BEGIN),
-            end=ck_utils.ts2dt(samples.SECOND_PERIOD_END))
+            begin=begin,
+            end=end)
         # FIXME(sheeprine): floating point error (transition to decimal)
-        self.assertEqual(1.9473999999999998, total)
+        self.assertEqual(1, len(total))
+        self.assertEqual(1.9473999999999998, total[0]["rate"])
+        self.assertEqual(begin, total[0]["begin"])
+        self.assertEqual(end, total[0]["end"])
 
     def test_get_total_filtering_on_one_period(self):
+        begin = ck_utils.ts2dt(samples.FIRST_PERIOD_BEGIN)
+        end = ck_utils.ts2dt(samples.FIRST_PERIOD_END)
         self.insert_data()
         total = self.storage.get_total(
-            begin=ck_utils.ts2dt(samples.FIRST_PERIOD_BEGIN),
-            end=ck_utils.ts2dt(samples.FIRST_PERIOD_END))
-        self.assertEqual(1.1074, total)
+            begin=begin,
+            end=end)
+        self.assertEqual(1, len(total))
+        self.assertEqual(1.1074, total[0]["rate"])
+        self.assertEqual(begin, total[0]["begin"])
+        self.assertEqual(end, total[0]["end"])
 
     def test_get_total_filtering_on_one_period_and_one_tenant(self):
+        begin = ck_utils.ts2dt(samples.FIRST_PERIOD_BEGIN)
+        end = ck_utils.ts2dt(samples.FIRST_PERIOD_END)
         self.insert_data()
         total = self.storage.get_total(
-            begin=ck_utils.ts2dt(samples.FIRST_PERIOD_BEGIN),
-            end=ck_utils.ts2dt(samples.FIRST_PERIOD_END),
+            begin=begin,
+            end=end,
             tenant_id=self._tenant_id)
-        self.assertEqual(0.5537, total)
+        self.assertEqual(1, len(total))
+        self.assertEqual(0.5537, total[0]["rate"])
+        self.assertEqual(self._tenant_id, total[0]["tenant_id"])
+        self.assertEqual(begin, total[0]["begin"])
+        self.assertEqual(end, total[0]["end"])
 
     def test_get_total_filtering_on_service(self):
+        begin = ck_utils.ts2dt(samples.FIRST_PERIOD_BEGIN)
+        end = ck_utils.ts2dt(samples.FIRST_PERIOD_END)
         self.insert_data()
         total = self.storage.get_total(
-            begin=ck_utils.ts2dt(samples.FIRST_PERIOD_BEGIN),
-            end=ck_utils.ts2dt(samples.FIRST_PERIOD_END),
+            begin=begin,
+            end=end,
             service='compute')
-        self.assertEqual(0.84, total)
+        self.assertEqual(1, len(total))
+        self.assertEqual(0.84, total[0]["rate"])
+        self.assertEqual('compute', total[0]["res_type"])
+        self.assertEqual(begin, total[0]["begin"])
+        self.assertEqual(end, total[0]["end"])
 
-    @mock.patch.object(ck_utils, 'utcnow',
-                       return_value=ck_utils.ts2dt(samples.INITIAL_TIMESTAMP))
-    def test_get_total_no_filter(self, patch_utcnow_mock):
+    def test_get_total_groupby_tenant(self):
+        begin = ck_utils.ts2dt(samples.FIRST_PERIOD_BEGIN)
+        end = ck_utils.ts2dt(samples.SECOND_PERIOD_END)
         self.insert_data()
-        total = self.storage.get_total()
-        self.assertEqual(1.9473999999999998, total)
-        self.assertEqual(2, patch_utcnow_mock.call_count)
+        total = self.storage.get_total(
+            begin=begin,
+            end=end,
+            groupby="tenant_id")
+        self.assertEqual(2, len(total))
+        self.assertEqual(0.9737, total[0]["rate"])
+        self.assertEqual(self._other_tenant_id, total[0]["tenant_id"])
+        self.assertEqual(begin, total[0]["begin"])
+        self.assertEqual(end, total[0]["end"])
+        self.assertEqual(0.9737, total[1]["rate"])
+        self.assertEqual(self._tenant_id, total[1]["tenant_id"])
+        self.assertEqual(begin, total[1]["begin"])
+        self.assertEqual(end, total[1]["end"])
+
+    def test_get_total_groupby_restype(self):
+        begin = ck_utils.ts2dt(samples.FIRST_PERIOD_BEGIN)
+        end = ck_utils.ts2dt(samples.SECOND_PERIOD_END)
+        self.insert_data()
+        total = self.storage.get_total(
+            begin=begin,
+            end=end,
+            groupby="res_type")
+        self.assertEqual(2, len(total))
+        self.assertEqual(0.2674, total[0]["rate"])
+        self.assertEqual('image', total[0]["res_type"])
+        self.assertEqual(begin, total[0]["begin"])
+        self.assertEqual(end, total[0]["end"])
+        self.assertEqual(1.68, total[1]["rate"])
+        self.assertEqual('compute', total[1]["res_type"])
+        self.assertEqual(begin, total[1]["begin"])
+        self.assertEqual(end, total[1]["end"])
+
+    def test_get_total_groupby_tenant_and_restype(self):
+        begin = ck_utils.ts2dt(samples.FIRST_PERIOD_BEGIN)
+        end = ck_utils.ts2dt(samples.SECOND_PERIOD_END)
+        self.insert_data()
+        total = self.storage.get_total(
+            begin=begin,
+            end=end,
+            groupby="tenant_id,res_type")
+        self.assertEqual(4, len(total))
+        self.assertEqual(0.1337, total[0]["rate"])
+        self.assertEqual(self._other_tenant_id, total[0]["tenant_id"])
+        self.assertEqual('image', total[0]["res_type"])
+        self.assertEqual(begin, total[0]["begin"])
+        self.assertEqual(end, total[0]["end"])
+        self.assertEqual(0.1337, total[1]["rate"])
+        self.assertEqual(self._tenant_id, total[1]["tenant_id"])
+        self.assertEqual('image', total[1]["res_type"])
+        self.assertEqual(begin, total[1]["begin"])
+        self.assertEqual(end, total[1]["end"])
+        self.assertEqual(0.84, total[2]["rate"])
+        self.assertEqual(self._other_tenant_id, total[2]["tenant_id"])
+        self.assertEqual('compute', total[2]["res_type"])
+        self.assertEqual(begin, total[2]["begin"])
+        self.assertEqual(end, total[2]["end"])
+        self.assertEqual(0.84, total[3]["rate"])
+        self.assertEqual(self._tenant_id, total[3]["tenant_id"])
+        self.assertEqual('compute', total[3]["res_type"])
+        self.assertEqual(begin, total[3]["begin"])
+        self.assertEqual(end, total[3]["end"])
 
     # Tenants
     def test_get_empty_tenant_with_nothing_in_storage(self):
@@ -381,229 +462,5 @@ class StorageTest(tests.TestCase):
             [self._other_tenant_id],
             tenants)
 
-    def add_invoice(self):
-
-        self.storage.add_invoice(invoice_id=samples.INVOICE_DICT_DEMO['invoice_id'],
-                                 invoice_date=ck_utils.ts2dt(samples.INVOICE_DICT_DEMO['invoice_date']),
-                                 invoice_period_from=ck_utils.ts2dt(samples.INVOICE_DICT_DEMO['invoice_period_from']),
-                                 invoice_period_to=ck_utils.ts2dt(samples.INVOICE_DICT_DEMO['invoice_period_to']),
-                                 tenant_id=samples.INVOICE_DICT_DEMO['tenant_id'],
-                                 invoice_data=json.dumps(samples.INVOICE_DICT_DEMO['invoice_data']),
-                                 tenant_name=samples.INVOICE_DICT_DEMO['tenant_name'],
-                                 total_cost=samples.INVOICE_DICT_DEMO['total_cost'],
-                                 paid_cost=samples.INVOICE_DICT_DEMO['paid_cost'],
-                                 balance_cost=samples.INVOICE_DICT_DEMO['balance_cost'],
-                                 payment_status=samples.INVOICE_DICT_DEMO['payment_status'])
-
-        self.storage.add_invoice(invoice_id=samples.INVOICE_DICT_ADMIN['invoice_id'],
-                                 invoice_date=ck_utils.ts2dt(samples.INVOICE_DICT_ADMIN['invoice_date']),
-                                 invoice_period_from=ck_utils.ts2dt(samples.INVOICE_DICT_ADMIN['invoice_period_from']),
-                                 invoice_period_to=ck_utils.ts2dt(samples.INVOICE_DICT_ADMIN['invoice_period_to']),
-                                 tenant_id=samples.INVOICE_DICT_ADMIN['tenant_id'],
-                                 invoice_data=json.dumps(samples.INVOICE_DICT_ADMIN['invoice_data']),
-                                 tenant_name=samples.INVOICE_DICT_ADMIN['tenant_name'],
-                                 total_cost=samples.INVOICE_DICT_ADMIN['total_cost'],
-                                 paid_cost=samples.INVOICE_DICT_ADMIN['paid_cost'],
-                                 balance_cost=samples.INVOICE_DICT_ADMIN['balance_cost'],
-                                 payment_status=samples.INVOICE_DICT_ADMIN['payment_status'])
-
-
-    """"""""""""""""""""""""
-    #Admin user - get invoice
-    """"""""""""""""""""""""
-
-    # get invoice based on tenant_id
-    # admin user
-    def test_get_invoice_based_on_tenant_id(self):
-
-        self.add_invoice()
-        data = self.storage.get_invoice(
-            tenant_id=samples.INVOICE_DICT_ADMIN['tenant_id'])
-        working_data = copy.deepcopy(samples.INVOICE_DATA_ADMIN_COMPARE)
-        self.assertEqual(working_data, data)
-
-    # get invoice based on payment_status
-    # admin user
-    def test_get_invoice_based_on_payment_status(self):
-
-        self.add_invoice()
-        data = self.storage.get_invoice(
-            payment_status=samples.INVOICE_DICT_ADMIN['payment_status'])
-        working_data = copy.deepcopy(samples.INVOICE_DATA_ADMIN_COMPARE)
-        self.assertEqual(working_data, data)
-
-    # get invoice based on invoice id
-    # admin user
-    def test_get_invoice_based_on_invoice_id(self):
-
-        self.add_invoice()
-        data = self.storage.get_invoice(   
-            invoice_id=samples.INVOICE_DICT_ADMIN['invoice_id'])
-        working_data = copy.deepcopy(samples.INVOICE_DATA_ADMIN_COMPARE)
-        self.assertEqual(working_data, data)
- 
-    # get invoice based on tenant name
-    # admin user
-    def test_get_invoice_based_on_tenant_name(self):
-
-        self.add_invoice()
-        data = self.storage.get_invoice(
-            tenant=samples.INVOICE_DICT_ADMIN['tenant_name'])
-        working_data = copy.deepcopy(samples.INVOICE_DATA_ADMIN_COMPARE)
-        self.assertEqual(working_data, data)
-
- 
-    """"""""""""""""""""""""
-    #Non-Admin user - get invoice
-    """"""""""""""""""""""""
-
-    # get invoice of admin user as non-admin user
-    # should not return invoice
-    # asserting not equal to check it
-    def test_get_invoice_of_admin_based_on_invoice_id_non_admin(self):
-
-        self.add_invoice()
-        data = self.storage.get_invoice_for_tenant(
-            invoice_id=samples.INVOICE_DICT_ADMIN['invoice_id'],
-	    tenant_name=samples.INVOICE_DICT_DEMO['tenant_name'])
-        working_data = copy.deepcopy(samples.INVOICE_DATA_ADMIN_COMPARE)
-        self.assertNotEqual(working_data, data)
-
-    # get invoice based on payment status
-    # non admin user
-    def test_get_invoice_based_on_payment_status_non_admin(self):
-
-        self.add_invoice()
-        data = self.storage.get_invoice_for_tenant(
-            payment_status=samples.INVOICE_DICT_DEMO['payment_status'],
-            tenant_name=samples.INVOICE_DICT_DEMO['tenant_name'])
-        working_data = copy.deepcopy(samples.INVOICE_DATA_DEMO_COMPARE)
-        self.assertEqual(working_data, data)
-
-    """"""""""""""""""""""""
-    #Admin user - list invoice
-    """"""""""""""""""""""""
-    # list the invoice
-    # admin user
-    def test_list_invoice(self):
-
-        self.add_invoice()
-        data = self.storage.list_invoice(
-            tenant_name=samples.INVOICE_DICT_DEMO['tenant_name'])
-        working_data = copy.deepcopy(samples.INVOICE_DATA_DEMO_COMPARE)
-        self.assertEqual(working_data, data)
-
-    # list the invoice - with all tenants options
-    # admin user
-    def test_list_invoice_all_tenants_option(self):
-
-        self.add_invoice()
-        data = self.storage.list_invoice(tenant_name=samples.INVOICE_DICT_ADMIN['tenant_name'], all_tenants='1')
-        working_data = copy.deepcopy(samples.ALL_INVOICES)
-        self.assertEqual(working_data, data)
-
-    """"""""""""""""""""""""
-    #Non-Admin user - list invoice
-    """"""""""""""""""""""""
-    # list the invoice
-    # non-admin user
-    def test_list_invoice_non_admin(self):
-
-        self.add_invoice()
-        data = self.storage.list_invoice(
-            tenant_name=samples.INVOICE_DICT_DEMO['tenant_name'])
-        working_data = copy.deepcopy(samples.INVOICE_DATA_DEMO_COMPARE)
-        self.assertEqual(working_data, data)
-
-    """"""""""""""""""""""""
-    #Admin user - show invoice
-    """"""""""""""""""""""""
-    # show own invoice by simply giving invoice id
-    # admin user
-    def test_show_invoice(self):
-
-        self.add_invoice()
-        data = self.storage.show_invoice(
-            invoice_id=samples.INVOICE_DICT_ADMIN['invoice_id'])
-        working_data = copy.deepcopy(samples.INVOICE_DATA_ADMIN_COMPARE)
-        self.assertEqual(working_data, data)
-
-    # show other's invoice by simply giving invoice id
-    # admin user
-    def test_show_invoice_others(self):
-
-        self.add_invoice()
-        data = self.storage.show_invoice(
-            invoice_id=samples.INVOICE_DICT_DEMO['invoice_id'])
-        working_data = copy.deepcopy(samples.INVOICE_DATA_DEMO_COMPARE)
-        self.assertEqual(working_data, data)
-
-    """"""""""""""""""""""""
-    # Non-Admin user - show invoice
-    """"""""""""""""""""""""
-    # show own invoice by simply giving invoice id
-    # Non-admin user
-    def test_show_invoice_non_admin(self):
-
-        self.add_invoice()
-        data = self.storage.show_invoice_for_tenant(
-	    tenant_name=samples.INVOICE_DICT_DEMO['tenant_name'],
-            invoice_id=samples.INVOICE_DICT_DEMO['invoice_id'])
-        working_data = copy.deepcopy(samples.INVOICE_DATA_DEMO_COMPARE)
-        self.assertEqual(working_data, data)
-    
-    # show other's invoice by simply giving invoice id
-    # not possible - other users invoice is not accessible
-    # Non-admin user
-    def test_show_invoice_others_non_admin(self):
-
-        self.add_invoice()
-        data = self.storage.show_invoice_for_tenant(
-	    tenant_name=samples.INVOICE_DICT_DEMO['tenant_name'],
-            invoice_id=samples.INVOICE_DICT_ADMIN['invoice_id'])
-        working_data = copy.deepcopy(samples.INVOICE_DATA_DEMO_COMPARE)
-        self.assertNotEqual(working_data, data)
-
-    """"""""""""""""""""""""
-    # Admin user - update invoice
-    """"""""""""""""""""""""
-    # update invoice based on the invoice id
-    # Admin user
-    def test_update_invoice(self):
-
-        self.add_invoice()
-        data = self.storage.update_invoice(
-            invoice_id=samples.INVOICE_DICT_DEMO['invoice_id'],
-            total_cost='3.50',
-            paid_cost='1.50',
-            balance_cost='2.00',
-            payment_status='1')
-        working_data = copy.deepcopy(samples.INVOICE_DATA_DEMO_COMPARE)
-        self.assertNotEqual(working_data, data)
-
-    """"""""""""""""""""""""
-    # Admin user - delete invoice
-    """"""""""""""""""""""""
-    # delete invoice based on the invoice id
-    # Admin user
-    def test_show_invoice_admin(self):
-
-        self.add_invoice()
-        data = self.storage.delete_invoice(
-            invoice_id=samples.INVOICE_DICT_DEMO['invoice_id'])
-        working_data = copy.deepcopy(samples.ALL_INVOICES)
-        self.assertNotEqual(working_data, data)
-
-
-    """"""""""""""""""""""""
-    # Admin user - Add invoice
-    """"""""""""""""""""""""
-    # Add invoice with all necessary details
-    # Admin user
-    def test_add_invoice_admin(self):
-
-        data = self.add_invoice()
-        working_data = copy.deepcopy(samples.ALL_INVOICES)
-        self.assertNotEqual(working_data, data)
 
 StorageTest.generate_scenarios()

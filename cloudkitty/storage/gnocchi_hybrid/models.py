@@ -25,7 +25,7 @@ Base = declarative.declarative_base()
 
 
 class HybridRatedDataframe(Base, models.ModelBase):
-    """An hybrid rated dataframe.
+    """A hybrid rated dataframe.
 
     """
     __table_args__ = {'mysql_charset': "utf8",
@@ -42,7 +42,7 @@ class HybridRatedDataframe(Base, models.ModelBase):
                                  nullable=False)
     rate = sqlalchemy.Column(sqlalchemy.Numeric(20, 8),
                              nullable=False)
-    resource_ref = sqlalchemy.Column(sqlalchemy.String(32),
+    resource_ref = sqlalchemy.Column(sqlalchemy.String(36),
                                      nullable=False)
     tenant_id = sqlalchemy.Column(sqlalchemy.String(32),
                                   nullable=True)
@@ -57,7 +57,7 @@ class HybridRatedDataframe(Base, models.ModelBase):
 
         # Resource information from gnocchi
         resource_data = collector.resource_info(
-            resource_type=self.res_type,
+            resource_name=self.res_type,
             start=self.begin,
             end=self.end,
             resource_id=self.resource_ref,
@@ -65,6 +65,7 @@ class HybridRatedDataframe(Base, models.ModelBase):
 
         # Encapsulate informations in a resource dict
         res_dict = {}
+        resource_data = resource_data[0]
         res_dict['desc'] = resource_data['desc']
         res_dict['vol'] = resource_data['vol']
         res_dict['rating'] = rating_dict

@@ -37,7 +37,8 @@ class DataFramesController(rest.RestController):
                          datetime.datetime,
                          wtypes.text,
                          wtypes.text)
-    def get_all(self, begin, end, tenant_id=None, resource_type=None):
+    def get_all(self, begin=None, end=None, tenant_id=None,
+                resource_type=None):
         """Return a list of rated resources for a time period and a tenant.
 
         :param begin: Start of the period
@@ -48,6 +49,11 @@ class DataFramesController(rest.RestController):
         """
 
         policy.enforce(pecan.request.context, 'storage:list_data_frames', {})
+
+        if not begin:
+            begin = ck_utils.get_month_start()
+        if not end:
+            end = ck_utils.get_next_month()
 
         begin_ts = ck_utils.dt2ts(begin)
         end_ts = ck_utils.dt2ts(end)
@@ -82,42 +88,6 @@ class DataFramesController(rest.RestController):
             pass
         return storage_models.DataFrameCollection(dataframes=dataframes)
 
-    @wsme_pecan.wsexpose(storage_models.DataFrameCollection,
-                         datetime.datetime,
-                         datetime.datetime,
-                         wtypes.text,
-                         wtypes.text,
-                         wtypes.text,
-                         wtypes.text,
-                         wtypes.text,
-                         wtypes.text)
-    def post(self, begin, end, unit, qty, rate, desc, tenant_id, res_type):
-        """Adding rated data frames.
-
-        :param begin: Start of the period
-        :param end: End of the period
-        :param unit: unit
-        :param qty: quantity
-        :param rate: rate
-        :param desc: description
-        :param tenant_id: UUID of the tenant
-        :param res_type: Type of the resource
-        :return: Collection of DataFrame objects.
-        """
-
-        kwargs = {
-                "begin": begin,
-                "end": end,
-                "tenant_id": tenant_id,
-                "unit": unit,
-                "qty": qty,
-                "res_type": res_type,
-                "rate": rate,
-                "desc": desc,
-        }
-        backend = pecan.request.storage_backend
-        frames = backend.add_time_frame_custom(**kwargs)
-        return storage_models.DataFrameCollection()
 
 class StorageController(rest.RestController):
     """REST Controller to access stored data."""

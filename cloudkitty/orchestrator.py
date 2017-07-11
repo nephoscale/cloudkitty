@@ -18,20 +18,21 @@
 #
 import decimal
 import random
-import uuid
 
 import eventlet
 from oslo_concurrency import lockutils
 from oslo_config import cfg
 from oslo_log import log as logging
-import oslo_messaging as messaging
+import oslo_messaging
+from oslo_utils import uuidutils
 from stevedore import driver
 from tooz import coordination
 
 from cloudkitty import collector
-from cloudkitty.common import rpc
 from cloudkitty import config  # noqa
 from cloudkitty import extension_manager
+from cloudkitty.i18n import _LI, _LW
+from cloudkitty import messaging
 from cloudkitty import storage
 from cloudkitty import transformer
 from cloudkitty import utils as ck_utils
@@ -56,8 +57,8 @@ PROCESSORS_NAMESPACE = 'cloudkitty.rating.processors'
 
 
 class RatingEndpoint(object):
-    target = messaging.Target(namespace='rating',
-                              version='1.1')
+    target = oslo_messaging.Target(namespace='rating',
+                                   version='1.1')
 
     def __init__(self, orchestrator):
         self._global_reload = False
@@ -85,26 +86,26 @@ class RatingEndpoint(object):
         return str(worker.quote(res_data))
 
     def reload_modules(self, ctxt):
-        LOG.info('Received reload modules command.')
+        LOG.info(_LI('Received reload modules command.'))
         lock = lockutils.lock('module-reload')
         with lock:
             self._global_reload = True
 
     def reload_module(self, ctxt, name):
-        LOG.info('Received reload command for module %s.', name)
+        LOG.info(_LI('Received reload command for module %s.'), name)
         lock = lockutils.lock('module-reload')
         with lock:
             if name not in self._pending_reload:
                 self._pending_reload.append(name)
 
     def enable_module(self, ctxt, name):
-        LOG.info('Received enable command for module %s.', name)
+        LOG.info(_LI('Received enable command for module %s.'), name)
         lock = lockutils.lock('module-state')
         with lock:
             self._module_state[name] = True
 
     def disable_module(self, ctxt, name):
-        LOG.info('Received disable command for module %s.', name)
+        LOG.info(_LI('Received disable command for module %s.'), name)
         lock = lockutils.lock('module-state')
         with lock:
             self._module_state[name] = False
@@ -152,7 +153,6 @@ class Worker(BaseWorker):
     def __init__(self, collector, storage, tenant_id=None):
         self._collector = collector
         self._storage = storage
-
         self._period = CONF.collect.period
         self._wait_time = CONF.collect.wait_periods * self._period
 
@@ -171,15 +171,9 @@ class Worker(BaseWorker):
 
     def check_state(self):
         timestamp = self._storage.get_state(self._tenant_id)
-        if not timestamp:
-            month_start = ck_utils.get_month_start()
-            return ck_utils.dt2ts(month_start)
-
-        now = ck_utils.utcnow_ts()
-        next_timestamp = timestamp + self._period
-        if next_timestamp + self._wait_time < now:
-            return next_timestamp
-        return 0
+        return ck_utils.check_time_state(timestamp,
+                                         self._period,
+                                         self._wait_time)
 
     def run(self):
         while True:
@@ -195,8 +189,9 @@ class Worker(BaseWorker):
                         raise
                     except Exception as e:
                         LOG.warning(
-                            'Error while collecting service %(service)s: '
-                            '%(error)s', {'service': service, 'error': e})
+                            _LW('Error while collecting service '
+                                '%(service)s: %(error)s'),
+                            {'service': service, 'error': e})
                         raise collector.NoDataCollected('', service)
                 except collector.NoDataCollected:
                     begin = timestamp
@@ -235,8 +230,11 @@ class Orchestrator(object):
         # DLM
         self.coord = coordination.get_coordinator(
             CONF.orchestrator.coordination_url,
-            str(uuid.uuid4()).encode('ascii'))
+            uuidutils.generate_uuid().encode('ascii'))
         self.coord.start()
+
+        self._period = CONF.collect.period
+        self._wait_time = CONF.collect.wait_periods * self._period
 
     def _lock(self, tenant_id):
         lock_name = b"cloudkitty-" + str(tenant_id).encode('ascii')
@@ -247,27 +245,20 @@ class Orchestrator(object):
         random.shuffle(self._tenants)
 
     def _init_messaging(self):
-        target = messaging.Target(topic='cloudkitty',
-                                  server=CONF.host,
-                                  version='1.0')
+        target = oslo_messaging.Target(topic='cloudkitty',
+                                       server=CONF.host,
+                                       version='1.0')
         endpoints = [
             self._rating_endpoint,
         ]
-        self.server = rpc.get_server(target, endpoints)
+        self.server = messaging.get_server(target, endpoints)
         self.server.start()
 
     def _check_state(self, tenant_id):
         timestamp = self.storage.get_state(tenant_id)
-        if not timestamp:
-            month_start = ck_utils.get_month_start()
-            return ck_utils.dt2ts(month_start)
-
-        now = ck_utils.utcnow_ts()
-        next_timestamp = timestamp + CONF.collect.period
-        wait_time = CONF.collect.wait_periods * CONF.collect.period
-        if next_timestamp + wait_time < now:
-            return next_timestamp
-        return 0
+        return ck_utils.check_time_state(timestamp,
+                                         self._period,
+                                         self._wait_time)
 
     def process_messages(self):
         # TODO(sheeprine): Code kept to handle threading and asynchronous
@@ -297,7 +288,7 @@ class Orchestrator(object):
                 # being processed
                 eventlet.sleep(1)
             # FIXME(sheeprine): We may cause a drift here
-            eventlet.sleep(CONF.collect.period)
+            eventlet.sleep(self._period)
 
     def terminate(self):
         self.coord.stop()

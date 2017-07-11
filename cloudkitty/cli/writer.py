@@ -19,17 +19,17 @@ from __future__ import print_function
 
 from oslo_config import cfg
 from oslo_utils import importutils as i_utils
-from stevedore import driver
 
 from cloudkitty import config  # noqa
 from cloudkitty import service
+from cloudkitty import storage
+from cloudkitty import utils as ck_utils
 from cloudkitty import write_orchestrator
 
 CONF = cfg.CONF
 CONF.import_opt('period', 'cloudkitty.collector', 'collect')
 CONF.import_opt('backend', 'cloudkitty.config', 'output')
 CONF.import_opt('basepath', 'cloudkitty.config', 'output')
-CONF.import_opt('backend', 'cloudkitty.storage', 'storage')
 STORAGES_NAMESPACE = 'cloudkitty.storage.backends'
 
 
@@ -42,13 +42,7 @@ class DBCommand(object):
         self._load_output_backend()
 
     def _load_storage_backend(self):
-        storage_args = {'period': CONF.collect.period}
-        backend = driver.DriverManager(
-            STORAGES_NAMESPACE,
-            CONF.storage.backend,
-            invoke_on_load=True,
-            invoke_kwds=storage_args).driver
-        self._storage = backend
+        self._storage = storage.get_storage()
 
     def _load_output_backend(self):
         backend = i_utils.import_class(CONF.output.backend)
@@ -56,6 +50,10 @@ class DBCommand(object):
 
     def generate(self):
         if not CONF.command.tenant:
+            if not CONF.command.begin:
+                CONF.command.begin = ck_utils.get_month_start()
+            if not CONF.command.end:
+                CONF.command.end = ck_utils.get_next_month()
             tenants = self._storage.get_tenants(CONF.command.begin,
                                                 CONF.command.end)
         else:
@@ -71,6 +69,10 @@ class DBCommand(object):
             wo.process()
 
     def tenants_list(self):
+        if not CONF.command.begin:
+            CONF.command.begin = ck_utils.get_month_start()
+        if not CONF.command.end:
+            CONF.command.end = ck_utils.get_next_month()
         tenants = self._storage.get_tenants(CONF.command.begin,
                                             CONF.command.end)
         print('Tenant list:')
@@ -78,17 +80,23 @@ class DBCommand(object):
             print(tenant)
 
 
-def add_command_parsers(subparsers):
-    command_object = DBCommand()
+def call_generate(command_object):
+    command_object.generate()
 
+
+def call_tenants_list(command_object):
+    command_object.tenants_list()
+
+
+def add_command_parsers(subparsers):
     parser = subparsers.add_parser('generate')
-    parser.set_defaults(func=command_object.generate)
+    parser.set_defaults(func=call_generate)
     parser.add_argument('--tenant', nargs='?')
     parser.add_argument('--begin', nargs='?')
     parser.add_argument('--end', nargs='?')
 
     parser = subparsers.add_parser('tenants_list')
-    parser.set_defaults(func=command_object.tenants_list)
+    parser.set_defaults(func=call_tenants_list)
     parser.add_argument('--begin', nargs='?')
     parser.add_argument('--end', nargs='?')
 
@@ -103,4 +111,5 @@ CONF.register_cli_opt(command_opt)
 
 def main():
     service.prepare_service()
-    CONF.command.func()
+    command_object = DBCommand()
+    CONF.command.func(command_object)

@@ -43,10 +43,7 @@ collect_opts = [
                          'volume',
                          'network.bw.in',
                          'network.bw.out',
-                         'network.floating',
-                         'cloudstorage',
-                         'instance.addon',
-                         'tenant.addon',],
+                         'network.floating'],
                 help='Services to monitor.'), ]
 
 CONF = cfg.CONF
@@ -67,6 +64,21 @@ def get_collector(transformers=None):
         invoke_on_load=True,
         invoke_kwds=collector_args).driver
     return collector
+
+
+def get_collector_metadata():
+    """Return dict of metadata.
+
+    Results are based on enabled collector and services in CONF.
+    """
+    transformers = transformer.get_transformers()
+    collector = driver.DriverManager(
+        COLLECTORS_NAMESPACE, CONF.collect.collector,
+        invoke_on_load=False).driver
+    metadata = {}
+    for service in CONF.collect.services:
+        metadata[service] = collector.get_metadata(service, transformers)
+    return metadata
 
 
 class TransformerDependencyError(Exception):
@@ -134,6 +146,16 @@ class BaseCollector(object):
         trans_resource = 'get_'
         trans_resource += resource_name.replace('.', '_')
         return trans_resource
+
+    @classmethod
+    def get_metadata(cls, resource_name, transformers):
+        """Return metadata about collected resource as a dict.
+
+           Dict object should contain:
+                - "metadata": available metadata list,
+                - "unit": collected quantity unit
+        """
+        return {"metadata": [], "unit": "undefined"}
 
     def retrieve(self,
                  resource,

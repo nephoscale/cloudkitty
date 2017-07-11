@@ -1,6 +1,11 @@
 {
     "context_is_admin":  "role:admin",
+    "admin_or_owner":  "is_admin:True or tenant:%(tenant_id)s",
     "default": "",
+
+    "info:list_services_info": "",
+    "info:get_service_info": "",
+    "info:get_config":"",
 
     "rating:list_modules": "role:admin",
     "rating:get_module": "role:admin",
@@ -8,13 +13,8 @@
     "rating:quote": "",
 
     "report:list_tenants": "role:admin",
-    "report:get_total": "",
-    "report:invoice": "",
-    "report:list_invoice": "",
-    "report:show_invoice": "",
-    "report:add_invoice": "role:admin",
-    "report:update_invoice": "role:admin",
-    "report:delete_invoice": "role:admin",
+    "report:get_summary": "rule:admin_or_owner",
+    "report:get_total": "rule:admin_or_owner",
 
     "collector:list_mappings": "role:admin",
     "collector:get_mapping": "role:admin",

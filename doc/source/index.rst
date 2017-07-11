@@ -10,8 +10,8 @@ Welcome to CloudKitty's developer documentation!
 Introduction
 ============
 
-CloudKitty is a Rating As A Service project aimed at translating Ceilometer
-metrics to prices.
+CloudKitty is a Rating As A Service project aimed at translating metrics
+to prices.
 
 Installation
 ============
@@ -19,8 +19,8 @@ Installation
 .. toctree::
    :maxdepth: 1
 
-   installation
    devstack
+   installation
 
 
 Architecture
@@ -42,14 +42,24 @@ API References
    webapi/v1
 
 
-Modules
-=======
+Modules API
+===========
 
 .. toctree::
    :maxdepth: 1
    :glob:
 
    webapi/rating/*
+
+Rating Module Documentation
+===========================
+
+.. toctree::
+   :maxdepth: 1
+
+   rating/introduction.rst
+   rating/hashmap.rst
+   rating/pyscripts.rst
 
 
 Indices and tables

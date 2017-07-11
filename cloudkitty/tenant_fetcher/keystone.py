@@ -21,16 +21,17 @@ from keystoneclient import client as kclient
 from keystoneclient import discover
 from keystoneclient import exceptions
 from oslo_config import cfg
-import six
 
 from cloudkitty import tenant_fetcher
 
 KEYSTONE_FETCHER_OPTS = 'keystone_fetcher'
+keystone_common_opts = ks_loading.get_auth_common_conf_options()
 keystone_fetcher_opts = [
     cfg.StrOpt('keystone_version',
                default='2',
                help='Keystone version to use.'), ]
 
+cfg.CONF.register_opts(keystone_common_opts, KEYSTONE_FETCHER_OPTS)
 cfg.CONF.register_opts(keystone_fetcher_opts, KEYSTONE_FETCHER_OPTS)
 ks_loading.register_session_conf_options(
     cfg.CONF,
@@ -62,7 +63,7 @@ class KeystoneFetcher(tenant_fetcher.BaseFetcher):
             CONF.keystone_fetcher.keystone_version)
         auth_dispatch = {(3,): ('project', 'projects', 'list'),
                          (2,): ('tenant', 'tenants', 'roles_for_user')}
-        for auth_version, auth_version_mapping in six.iteritems(auth_dispatch):
+        for auth_version, auth_version_mapping in auth_dispatch.items():
             if discover.version_match(auth_version, keystone_version):
                 return self._do_get_tenants(auth_version_mapping)
         msg = "Keystone version you've specified is not supported"

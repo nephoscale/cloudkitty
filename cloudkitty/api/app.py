@@ -26,7 +26,7 @@ import pecan
 
 from cloudkitty.api import config as api_config
 from cloudkitty.api import hooks
-from cloudkitty import rpc
+from cloudkitty.i18n import _LI
 from cloudkitty import storage
 
 
@@ -49,7 +49,7 @@ api_opts = [
               default="0.0.0.0",
               help='Host serving the API.'),
     cfg.PortOpt('port',
-                default=8888,
+                default=8889,
                 help='Host port serving the API.'),
     cfg.BoolOpt('pecan_debug',
                 default=False,
@@ -70,18 +70,12 @@ def get_pecan_config():
 def setup_app(pecan_config=None, extra_hooks=None):
 
     app_conf = get_pecan_config()
-
-    client = rpc.get_client()
-
     storage_backend = storage.get_storage()
-
     app_hooks = [
-        hooks.RPCHook(client),
+        hooks.RPCHook(),
         hooks.StorageHook(storage_backend),
+        hooks.ContextHook(),
     ]
-
-    if CONF.auth_strategy == 'keystone':
-        app_hooks.append(hooks.ContextHook())
 
     app = pecan.make_app(
         app_conf.app.root,
@@ -106,7 +100,7 @@ def load_app():
 
     if not cfg_file:
         raise cfg.ConfigFilesNotFoundError([cfg.CONF.api_paste_config])
-    LOG.info("Full WSGI config used: %s" % cfg_file)
+    LOG.info(_LI("Full WSGI config used: %s"), cfg_file)
     return deploy.loadapp("config:" + cfg_file)
 
 
@@ -114,15 +108,16 @@ def build_server():
     # Create the WSGI server and start it
     host = CONF.api.host_ip
     port = CONF.api.port
-    LOG.info('Starting server in PID %s', os.getpid())
-    LOG.info("Configuration:")
+    LOG.info(_LI('Starting server in PID %s'), os.getpid())
+    LOG.info(_LI("Configuration:"))
     cfg.CONF.log_opt_values(LOG, logging.INFO)
 
     if host == '0.0.0.0':
-        LOG.info('serving on 0.0.0.0:%(sport)s, view at http://127.0.0.1:%'
-                 '(vport)s', {'sport': port, 'vport': port})
+        LOG.info(_LI('serving on 0.0.0.0:%(sport)s, view at '
+                     'http://127.0.0.1:%(vport)s'),
+                 {'sport': port, 'vport': port})
     else:
-        LOG.info("serving on http://%(host)s:%(port)s",
+        LOG.info(_LI("serving on http://%(host)s:%(port)s"),
                  {'host': host, 'port': port})
 
     server_cls = simple_server.WSGIServer

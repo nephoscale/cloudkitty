@@ -177,10 +177,9 @@ class BaseStorage(object):
         :param tenant_id: tenant_id to filter on.
         """
 
-    # Modified by Muralidharan.s for applying a logic for getting 
-    # Total value based on Instance
     @abc.abstractmethod
-    def get_total(self, begin=None, end=None, tenant_id=None, service=None, instance_id=None):
+    def get_total(self, begin=None, end=None, tenant_id=None,
+                  service=None, instance_id=None):
         """Return the current total.
 
         :param begin: When to start filtering.
@@ -191,15 +190,14 @@ class BaseStorage(object):
         :type res_type: str
         :param service: Filter on the resource type.
         :type service: str
-        :param service: Filter on the instance_id.
-        :type service: str
+        :param groupby: Fields to group by, separated by commas if multiple.
+        :type groupby: str
         """
 
     # Get invoice for admin tenant
     @abc.abstractmethod
     def get_invoice(self, tenant_id=None, tenant=None, invoice_id= None, payment_status=None):
         """Return the invoice.
-
         :param tenant_id: Filter on the tenant_id.
         :type res_type: str
         :param tenant: Filter on the tenant name as input
@@ -214,7 +212,6 @@ class BaseStorage(object):
     @abc.abstractmethod
     def get_invoice_for_tenant(self, tenant_name, invoice_id= None, payment_status=None):
         """Return the invoice.
-
 	:param tenant_name: tenant_name from request
 	:type res_type: str
         :param invoice_id: Filter on the invoice_id.
@@ -227,7 +224,6 @@ class BaseStorage(object):
     @abc.abstractmethod
     def list_invoice(self, tenant_name, all_tenants=None):
         """Return the invoice list.
-
         :param tenant_name: Filter on the tenant_name.
         :type res_type: str
         :param all_tenants: param for getting all tenant details
@@ -239,7 +235,6 @@ class BaseStorage(object):
     @abc.abstractmethod
     def show_invoice_for_tenant(self, tenant_name, invoice_id):
         """Show the invoice for tenant.
-
         :param tenant_name: Filter on the tenant_name.
         :type res_type: str
         :param invoice_id: param for getting invoice id
@@ -250,7 +245,6 @@ class BaseStorage(object):
     @abc.abstractmethod
     def show_invoice(self, invoice_id):
         """Show the invoice for admin.
-
         :param invoice_id: param for getting invoice id
         :type res_type: str
         """
@@ -259,7 +253,6 @@ class BaseStorage(object):
     @abc.abstractmethod
     def add_invoice(self, invoice_id, invoice_date, invoice_period_from, invoice_period_to, tenant_id, invoice_data, tenant_name, total_cost, paid_cost, balance_cost, payment_status):
         """Add the invoice.
-
         :param invoice_id: invoice_id values
         :type res_type: str
         :param invoice_date: invoice_date values
@@ -289,7 +282,6 @@ class BaseStorage(object):
     @abc.abstractmethod
     def update_invoice(self, invoice_id=None, total_cost=None, paid_cost=None, balance_cost=None, payment_status=None):
         """Update the invoice.
-
         :param invoice_id: invoice_id values
         :type res_type: str
         :param total_cost: total cost detail 
@@ -306,13 +298,12 @@ class BaseStorage(object):
     @abc.abstractmethod
     def delete_invoice(self, invoice_id=None):
         """Delete the invoice.
-
         :param invoice_id: invoice_id values
         :type res_type: str
         """
 
     @abc.abstractmethod
-    def get_tenants(self, begin=None, end=None):
+    def get_tenants(self, begin, end):
         """Return the list of rated tenants.
 
         :param begin: When to start filtering.

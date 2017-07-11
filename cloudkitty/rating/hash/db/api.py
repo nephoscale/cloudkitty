@@ -32,7 +32,15 @@ def get_instance():
     return IMPL
 
 
-class NoSuchService(Exception):
+class BaseHashMapError(Exception):
+    """Base class for HashMap errors."""
+
+
+class ClientHashMapError(BaseHashMapError):
+    """Base class for client side errors."""
+
+
+class NoSuchService(ClientHashMapError):
     """Raised when the service doesn't exist."""
 
     def __init__(self, name=None, uuid=None):
@@ -42,7 +50,7 @@ class NoSuchService(Exception):
         self.uuid = uuid
 
 
-class NoSuchField(Exception):
+class NoSuchField(ClientHashMapError):
     """Raised when the field doesn't exist for the service."""
 
     def __init__(self, uuid):
@@ -51,7 +59,7 @@ class NoSuchField(Exception):
         self.uuid = uuid
 
 
-class NoSuchGroup(Exception):
+class NoSuchGroup(ClientHashMapError):
     """Raised when the group doesn't exist."""
 
     def __init__(self, name=None, uuid=None):
@@ -61,7 +69,7 @@ class NoSuchGroup(Exception):
         self.uuid = uuid
 
 
-class NoSuchMapping(Exception):
+class NoSuchMapping(ClientHashMapError):
     """Raised when the mapping doesn't exist."""
 
     def __init__(self, uuid):
@@ -70,7 +78,7 @@ class NoSuchMapping(Exception):
         self.uuid = uuid
 
 
-class NoSuchThreshold(Exception):
+class NoSuchThreshold(ClientHashMapError):
     """Raised when the threshold doesn't exist."""
 
     def __init__(self, uuid):
@@ -79,7 +87,7 @@ class NoSuchThreshold(Exception):
         self.uuid = uuid
 
 
-class NoSuchType(Exception):
+class NoSuchType(ClientHashMapError):
     """Raised when a mapping type is not handled."""
 
     def __init__(self, map_type):
@@ -89,7 +97,7 @@ class NoSuchType(Exception):
         self.map_type = map_type
 
 
-class ServiceAlreadyExists(Exception):
+class ServiceAlreadyExists(ClientHashMapError):
     """Raised when the service already exists."""
 
     def __init__(self, name, uuid):
@@ -99,7 +107,7 @@ class ServiceAlreadyExists(Exception):
         self.uuid = uuid
 
 
-class FieldAlreadyExists(Exception):
+class FieldAlreadyExists(ClientHashMapError):
     """Raised when the field already exists."""
 
     def __init__(self, field, uuid):
@@ -109,7 +117,7 @@ class FieldAlreadyExists(Exception):
         self.uuid = uuid
 
 
-class GroupAlreadyExists(Exception):
+class GroupAlreadyExists(ClientHashMapError):
     """Raised when the group already exists."""
 
     def __init__(self, name, uuid):
@@ -119,27 +127,49 @@ class GroupAlreadyExists(Exception):
         self.uuid = uuid
 
 
-class MappingAlreadyExists(Exception):
+class MappingAlreadyExists(ClientHashMapError):
     """Raised when the mapping already exists."""
 
-    def __init__(self, mapping, uuid):
+    def __init__(self,
+                 mapping,
+                 parent_id=None,
+                 parent_type=None,
+                 uuid=None,
+                 tenant_id=None):
+        # TODO(sheeprine): UUID is deprecated
+        parent_id = parent_id if parent_id else uuid
         super(MappingAlreadyExists, self).__init__(
-            "Mapping %s already exists (UUID: %s)" % (mapping, uuid))
+            "Mapping '%s' already exists for %s '%s', tenant: '%s'"
+            % (mapping, parent_type, parent_id, tenant_id))
         self.mapping = mapping
-        self.uuid = uuid
+        self.uuid = parent_id
+        self.parent_id = parent_id
+        self.parent_type = parent_type
+        self.tenant_id = tenant_id
 
 
-class ThresholdAlreadyExists(Exception):
+class ThresholdAlreadyExists(ClientHashMapError):
     """Raised when the threshold already exists."""
 
-    def __init__(self, threshold, uuid):
+    def __init__(self,
+                 threshold,
+                 parent_id=None,
+                 parent_type=None,
+                 uuid=None,
+                 tenant_id=None):
+        # TODO(sheeprine): UUID is deprecated
+        parent_id = parent_id if parent_id else uuid
         super(ThresholdAlreadyExists, self).__init__(
-            "Threshold %s already exists (UUID: %s)" % (threshold, uuid))
+            "Threshold '%s' already exists for %s '%s', tenant: '%s'"
+            % (threshold, parent_type, parent_id, tenant_id))
         self.threshold = threshold
-        self.uuid = uuid
+        self.uuid = parent_id
+        self.parent_id = parent_id
+        self.parent_type = parent_type
+        self.tenant_id = tenant_id
 
 
-class MappingHasNoGroup(Exception):
+class MappingHasNoGroup(ClientHashMapError):
     """Raised when the mapping is not attached to a group."""
 
     def __init__(self, uuid):
@@ -148,7 +178,7 @@ class MappingHasNoGroup(Exception):
         self.uuid = uuid
 
 
-class ThresholdHasNoGroup(Exception):
+class ThresholdHasNoGroup(ClientHashMapError):
     """Raised when the threshold is not attached to a group."""
 
     def __init__(self, uuid):
@@ -185,10 +215,11 @@ class HashMap(object):
         """
 
     @abc.abstractmethod
-    def get_group(self, uuid):
+    def get_group(self, uuid=None, name=None):
         """Return a group object.
 
         :param uuid: UUID of the group to get.
+        :param name: Name of the group to get.
         """
 
     @abc.abstractmethod
@@ -229,13 +260,15 @@ class HashMap(object):
                       service_uuid=None,
                       field_uuid=None,
                       group_uuid=None,
-                      no_group=False):
+                      no_group=False,
+                      **kwargs):
         """Return an UUID list of every mapping.
 
         :param service_uuid: The service to filter on.
         :param field_uuid: The field to filter on.
         :param group_uuid: The group to filter on.
         :param no_group: Filter on mappings without a group.
+        :param tenant_uuid: The tenant to filter on.
 
         :return list(str): List of mappings' UUID.
         """
@@ -245,13 +278,15 @@ class HashMap(object):
                         service_uuid=None,
                         field_uuid=None,
                         group_uuid=None,
-                        no_group=False):
+                        no_group=False,
+                        **kwargs):
         """Return an UUID list of every threshold.
 
         :param service_uuid: The service to filter on.
         :param field_uuid: The field to filter on.
         :param group_uuid: The group to filter on.
         :param no_group: Filter on thresholds without a group.
+        :param tenant_uuid: The tenant to filter on.
 
         :return list(str): List of thresholds' UUID.
         """
@@ -285,7 +320,8 @@ class HashMap(object):
                        value=None,
                        service_id=None,
                        field_id=None,
-                       group_id=None):
+                       group_id=None,
+                       tenant_id=None):
         """Create a new service/field mapping.
 
         :param cost: Rating value to apply to this mapping.
@@ -294,6 +330,7 @@ class HashMap(object):
         :param service_id: Service the mapping is applying to.
         :param field_id: Field the mapping is applying to.
         :param group_id: The group of calculations to apply.
+        :param tenant_id: The tenant to apply calculations to.
         """
 
     @abc.abstractmethod
@@ -303,7 +340,8 @@ class HashMap(object):
                          level=None,
                          service_id=None,
                          field_id=None,
-                         group_id=None):
+                         group_id=None,
+                         tenant_id=None):
         """Create a new service/field threshold.
 
         :param cost: Rating value to apply to this threshold.
@@ -312,6 +350,7 @@ class HashMap(object):
         :param service_id: Service the threshold is applying to.
         :param field_id: Field the threshold is applying to.
         :param group_id: The group of calculations to apply.
+        :param tenant_id: The tenant to apply calculations to.
         """
 
     @abc.abstractmethod
