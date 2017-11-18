@@ -22,6 +22,10 @@ from keystoneclient import discover
 from keystoneclient import exceptions
 from oslo_config import cfg
 import six
+import ConfigParser
+from keystoneclient.v3 import client as kclient_v3
+from keystoneauth1.identity import v3
+from keystoneauth1 import session
 
 from cloudkitty import tenant_fetcher
 
@@ -70,12 +74,35 @@ class KeystoneFetcher(tenant_fetcher.BaseFetcher):
 
     def _do_get_tenants(self, auth_version_mapping):
         tenant_attr, tenants_attr, role_func = auth_version_mapping
-        tenant_list = getattr(self.admin_ks, tenants_attr).list()
+        
+        config_file = CONF.config_file[0]
+        config = ConfigParser.ConfigParser()
+        config.read(config_file)
+        connection = dict(config.items("keystone_fetcher"))
+        
+        # kwargs for connection
+        kwargs_conn = {
+            "username" : connection['admin_username'],
+            "password" : connection['admin_password'],
+            "auth_url" : connection['auth_url'],
+            "project_name" : connection['admin_project_name'],
+            "user_domain_id" : connection['user_domain_id'],
+            "project_domain_id" : connection['project_domain_id'],
+        }
+        
+        auth = v3.Password(**kwargs_conn)
+        auth_session = session.Session(auth = auth)
+        keystone = kclient_v3.Client(session = auth_session)
+        tenant_list = keystone.projects.list()
+        
+        # tenant_list = getattr(self.admin_ks, tenants_attr).list()
+        
         my_user_id = self.session.get_user_id()
         for tenant in tenant_list[:]:
-            roles = getattr(self.admin_ks.roles, role_func)(
+            roles = getattr(keystone.roles, role_func)(
                 **{'user': my_user_id,
                    tenant_attr: tenant})
             if 'rating' not in [role.name for role in roles]:
                 tenant_list.remove(tenant)
+                
         return [tenant.id for tenant in tenant_list]
