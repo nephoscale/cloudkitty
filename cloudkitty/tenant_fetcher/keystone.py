@@ -99,9 +99,7 @@ class KeystoneFetcher(tenant_fetcher.BaseFetcher):
         
         my_user_id = self.session.get_user_id()
         for tenant in tenant_list[:]:
-            roles = getattr(keystone.roles, role_func)(
-                **{'user': my_user_id,
-                   tenant_attr: tenant})
+            roles = getattr(keystone.roles, role_func)(**{tenant_attr: tenant})
             if 'rating' not in [role.name for role in roles]:
                 tenant_list.remove(tenant)
                 
