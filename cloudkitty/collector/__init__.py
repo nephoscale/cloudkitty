@@ -41,6 +41,7 @@ collect_opts = [
                 default=['compute',
                          'image',
                          'volume',
+                         'volume.snapshot',
                          'network.bw.in',
                          'network.bw.out',
                          'network.floating',

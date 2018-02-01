@@ -234,6 +234,43 @@ class CeilometerCollector(collector.BaseCollector):
         if not volume_data:
             raise collector.NoDataCollected(self.collector_name, 'volume')
         return self.t_cloudkitty.format_service('volume', volume_data)
+    
+    def get_volume_snapshot(self, start, end=None, project_id=None, q_filter=None):
+        '''
+            function added to collect snapshot usage
+            @param start: start period of  statistics
+            @param end: end period of  statistics
+            @param project_id: the id of the project
+            @param q_filter: the filter used for search in statistics
+        '''
+        
+        active_volume_snapshot_stats = self.resources_stats(
+            'snapshot.size', start, end, project_id, q_filter)
+        
+        # loop through the statistics retrieved from ceilometer
+        volume_snapshot_data = []
+        for volume_snapshot_stats in active_volume_snapshot_stats:
+            volume_snapshot_id = volume_snapshot_stats.groupby['resource_id']
+            
+            # check for resource details in cache
+            if not self._cacher.has_resource_detail('volume.snapshot', volume_snapshot_id):
+                raw_resource = self._conn.resources.get(volume_snapshot_id)
+                volume_snapshot = self.t_ceilometer.strip_resource_data('volume.snapshot', raw_resource)
+                self._cacher.add_resource_detail('volume.snapshot',
+                                                 volume_snapshot_id,
+                                                 volume_snapshot)
+                
+            volume_snapshot = self._cacher.get_resource_detail('volume.snapshot', volume_snapshot_id)
+            volume_snapshot_data.append(self.t_cloudkitty.format_item(
+                                                                      volume_snapshot, 
+                                                                      'GB', 
+                                                                      volume_snapshot_stats.max))
+        
+        # if no data found    
+        if not volume_snapshot_data:
+            raise collector.NoDataCollected(self.collector_name, 'volume.snapshot')
+        
+        return self.t_cloudkitty.format_service('volume.snapshot', volume_snapshot_data)
 
     def _get_network_bw(self,
                         direction,
