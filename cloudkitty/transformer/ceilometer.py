@@ -58,6 +58,7 @@ class CeilometerTransformer(transformer.BaseTransformer):
         res_data['project_id'] = data.project_id
         res_data['volume_id'] = data.metadata['volume_id']
         res_data['availability_zone'] = data.metadata['availability_zone']
+	res_data['volume_type'] = data.metadata['volume_type']
         res_data['size'] = data.metadata['size']
         return res_data
 
