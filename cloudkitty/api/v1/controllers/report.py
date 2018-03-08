@@ -207,8 +207,10 @@ class ReportController(rest.RestController):
                          wtypes.text,
                          wtypes.text,
                          wtypes.text,
+                         wtypes.text,
+                         wtypes.text,
                          wtypes.text)
-    def add_invoice(self, invoice_id, invoice_date, invoice_period_from, invoice_period_to, tenant_id, invoice_data, tenant_name, total_cost, paid_cost, balance_cost, payment_status ):
+    def add_invoice(self, invoice_id, invoice_date, invoice_period_from, invoice_period_to, tenant_id, invoice_data, tenant_name, total_cost, paid_cost, balance_cost, payment_status, vat_rate, total_cost_after_vat):
         """Add the Invoice details.
         """
 
@@ -236,7 +238,9 @@ class ReportController(rest.RestController):
                                               total_cost, 
                                               paid_cost, 
                                               balance_cost, 
-                                              payment_status)
+                                              payment_status,
+                                              vat_rate,
+                                              total_cost_after_vat)
 
     # Updating the invoice
     @wsme_pecan.wsexpose([wtypes.text],

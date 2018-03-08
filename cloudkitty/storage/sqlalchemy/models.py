@@ -110,6 +110,10 @@ class InvoiceDetails(Base, models.ModelBase):
                              nullable=False)
     total_cost = sqlalchemy.Column(sqlalchemy.Float(precision='13,2'),
                              nullable=True)
+    total_cost_after_vat = sqlalchemy.Column(sqlalchemy.Float(precision='13,2'),
+                             nullable=True)
+    vat_rate = sqlalchemy.Column(sqlalchemy.Float(precision='13,2'),
+                             nullable=True)
     paid_cost = sqlalchemy.Column(sqlalchemy.Float(precision='13,2'),
                              nullable=True)
     balance_cost = sqlalchemy.Column(sqlalchemy.Float(precision='13,2'),
@@ -129,6 +133,8 @@ class InvoiceDetails(Base, models.ModelBase):
         invoice_dict['invoice_id'] = self.invoice_id
         invoice_dict['invoice_data'] = json.loads(self.invoice_data)
         invoice_dict['total_cost'] = json.dumps(self.total_cost, use_decimal=True)
+        invoice_dict['total_cost_after_vat'] = json.dumps(self.total_cost_after_vat, use_decimal=True)
+        invoice_dict['vat_rate'] = json.dumps(self.vat_rate, use_decimal=True)
         invoice_dict['paid_cost'] = json.dumps(self.paid_cost, use_decimal=True)
         invoice_dict['balance_cost'] = json.dumps(self.balance_cost, use_decimal=True)
         invoice_dict['payment_status'] = self.payment_status
