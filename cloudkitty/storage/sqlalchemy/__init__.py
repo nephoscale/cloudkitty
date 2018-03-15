@@ -92,7 +92,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
 
     # Modified by Muralidharan.s for applying a logic for getting 
     # Total value based on Instance
-    def get_total(self, begin=None, end=None, tenant_id=None, service=None, instance_id=None):
+    def get_total(self, begin=None, end=None, tenant_id=None, service=None, instance_id=None, volume_type_id=None):
         model = models.RatedDataFrame
 
         # Boundary calculation
@@ -113,6 +113,10 @@ class SQLAlchemyStorage(storage.BaseStorage):
         if instance_id:
             q = q.filter(
                 models.RatedDataFrame.desc.like('%'+instance_id+'%'))
+
+	# check for volume type id
+	if volume_type_id:
+	    q = q.filter(models.RatedDataFrame.desc.like('%' + volume_type_id + '%'))    
 
         q = q.filter(
             model.begin >= begin,

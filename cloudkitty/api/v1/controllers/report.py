@@ -59,11 +59,12 @@ class ReportController(rest.RestController):
                          datetime.datetime,
                          wtypes.text,
                          wtypes.text,
+			 wtypes.text,
                          wtypes.text)
 
     # Modified by Muralidharan.s for applying a logic for getting 
     # Total value based on Instance
-    def total(self, begin=None, end=None, tenant_id=None, service=None, instance_id=None):
+    def total(self, begin=None, end=None, tenant_id=None, service=None, instance_id=None, volume_type_id=None):
         """Return the amount to pay for a given period.
 
         """
@@ -72,7 +73,7 @@ class ReportController(rest.RestController):
         # FIXME(sheeprine): We should filter on user id.
         # Use keystone token information by default but make it overridable and
         # enforce it by policy engine
-        total = storage.get_total(begin, end, tenant_id, service, instance_id)
+        total = storage.get_total(begin, end, tenant_id, service, instance_id, volume_type_id)
         return total if total else decimal.Decimal('0')
 
     # For getting the invoice for admin and non-admin tenants
