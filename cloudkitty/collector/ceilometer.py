@@ -16,8 +16,13 @@
 # @author: Stéphane Albert
 #
 from ceilometerclient import client as cclient
+from novaclient import client as nova_client
+from cinderclient import client as cinder_client
 from keystoneauth1 import loading as ks_loading
 from oslo_config import cfg
+from keystoneauth1.identity import v3
+from keystoneauth1 import session
+import ConfigParser
 
 from cloudkitty import collector
 from cloudkitty import utils as ck_utils
@@ -90,6 +95,28 @@ class CeilometerCollector(collector.BaseCollector):
             '2',
             session=self.session)
 
+        # get config file and conf
+        config_file = CONF.config_file[0]
+        config = ConfigParser.ConfigParser()
+        config.read(config_file)
+        connection = dict(config.items("keystone_fetcher"))
+        
+        # kwargs for connection
+        kwargs_conn = {
+            "username" : connection['admin_username'],
+            "password" : connection['admin_password'],
+            "auth_url" : connection['auth_url'],
+            "project_name" : connection['admin_project_name'],
+            "user_domain_id" : connection['user_domain_id'],
+            "project_domain_id" : connection['project_domain_id'],
+        }
+        
+        # create nova and cinder connection
+        auth = v3.Password(**kwargs_conn)
+        auth_session = session.Session(auth = auth)
+        self._nova_conn = nova_client.Client('2', session = auth_session)
+        self._cinder_conn = cinder_client.Client('2', session = auth_session)
+
     def gen_filter(self, op='eq', **kwargs):
         """Generate ceilometer filter from kwargs."""
         q_filter = []
@@ -159,15 +186,53 @@ class CeilometerCollector(collector.BaseCollector):
         return [resource.groupby['resource_id']
                 for resource in resources_stats]
 
+    def get_instance_image_from_volume(self, instance_id):
+        """
+            Function to fetch the images associated with the volume from which instance is created
+            @param instance_id: the id of the isnatnce
+            returns : image_id
+        """
+
+        image_id = None
+        
+        try:
+            
+            # Get instance volume details
+            instance_det = self._nova_conn.servers.get(instance_id)
+            instance_vol_details = instance_det._info['os-extended-volumes:volumes_attached']
+    
+            # Get image details
+            for volume in instance_vol_details:
+                volume_det = self._cinder_conn.volumes.get(volume['id'])
+                
+                # check image id is not empty
+                if volume_det.volume_image_metadata['image_id']:
+                    image_id = volume_det.volume_image_metadata['image_id']
+                    break
+                
+        except Exception as e:
+            print e
+            print "Error: Instance details could not retrieved - " + str(instance_id)
+
+        return image_id
+
     def get_compute(self, start, end=None, project_id=None, q_filter=None):
         active_instance_ids = self.active_resources('instance', start, end,
                                                     project_id, q_filter)
+
         compute_data = []
         for instance_id in active_instance_ids:
+
             if not self._cacher.has_resource_detail('compute', instance_id):
                 raw_resource = self._conn.resources.get(instance_id)
                 instance = self.t_ceilometer.strip_resource_data('compute',
                                                                  raw_resource)
+
+                # if image id is empty, find image id from volume
+                if instance['image_id'] is None:
+                    instance['image_id'] = self.get_instance_image_from_volume(instance['instance_id'])
+
+
                 self._cacher.add_resource_detail('compute',
                                                  instance_id,
                                                  instance)
@@ -176,6 +241,7 @@ class CeilometerCollector(collector.BaseCollector):
             compute_data.append(self.t_cloudkitty.format_item(instance,
                                                               'instance',
                                                               1))
+            
         if not compute_data:
             raise collector.NoDataCollected(self.collector_name, 'compute')
         return self.t_cloudkitty.format_service('compute', compute_data)
