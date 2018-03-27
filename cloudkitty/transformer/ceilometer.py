@@ -61,14 +61,17 @@ class CeilometerTransformer(transformer.BaseTransformer):
         res_data['size'] = data.metadata['size']
         return res_data    
 
-    def _strip_volume(self, data):
+    def _strip_volume_snapshot(self, data):
+        '''
+            function to strip elements of snapshot resource
+            @param data: data to be strip
+        '''
+        
         res_data = {}
-        res_data['user_id'] = data.user_id
         res_data['project_id'] = data.project_id
+        res_data['snapshot_id'] = data.resource_id
         res_data['volume_id'] = data.metadata['volume_id']
-        res_data['availability_zone'] = data.metadata['availability_zone']
-        res_data['volume_type'] = data.metadata['volume_type']
-        res_data['size'] = data.metadata['size']
+        res_data['size'] = data.metadata['volume_size']
         return res_data    
 
     def strip_resource_data(self, res_type, res_data):
