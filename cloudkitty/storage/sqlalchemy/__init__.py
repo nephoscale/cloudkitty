@@ -34,6 +34,7 @@ import sqlalchemy.ext.declarative
 import sqlalchemy.orm.interfaces
 import sqlalchemy.exc
 import datetime
+import ast
 
 class SQLAlchemyStorage(storage.BaseStorage):
     """SQLAlchemy Storage Backend
