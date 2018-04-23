@@ -426,3 +426,64 @@ class SQLAlchemyStorage(storage.BaseStorage):
         """
         frame = self.frame_model(**kwargs)
         self._session[kwargs.get('tenant_id')].add(frame)
+        
+    def get_image_usage_count(self, begin, end):
+        """
+            function to get image usage
+            :param begin: Start of the dataframe.
+            :param end: End of the dataframe.
+        """
+        
+        instance_id_dict = {}
+        image_count_dict = {}
+        
+        try:
+            session = db.get_session()
+            q = utils.model_query(self.frame_model, session)
+            q = q.filter(
+                self.frame_model.begin >= begin,
+                self.frame_model.end <= end,
+                self.frame_model.res_type == 'compute')
+            
+            result_list = q.all()
+            
+            # Get the resource details and calculate the image id used
+            for usage in result_list:
+                
+                usage_date = str(usage['begin'].date())
+                usage_resource_desc = ast.literal_eval(usage['desc'])
+            
+                # check whether data frames contains instance id
+                if usage_resource_desc.has_key('instance_id'):
+                    
+                    # if no key set for the respective date
+                    if not image_count_dict.has_key(usage_date):
+                        image_count_dict[usage_date] = {}
+                    
+                    # if no key set for the respective date
+                    if not instance_id_dict.has_key(usage_date):
+                        instance_id_dict[usage_date] = {}
+                    
+                    instance_id = usage_resource_desc['instance_id']
+                    
+                    # if instance already checked for that day, skip further execution
+                    if instance_id_dict[usage_date].has_key(instance_id):
+                        continue
+                    
+                    instance_image_id = usage_resource_desc.get('image_id')
+                    
+                    # if image id is not empty
+                    if instance_image_id and instance_image_id is not None:
+                        
+                        # Check for the image id key
+                        if image_count_dict[usage_date].has_key(instance_image_id):
+                            image_count_dict[usage_date][instance_image_id] += 1
+                        else:
+                            image_count_dict[usage_date][instance_image_id] = 1
+                            
+                        instance_id_dict[usage_date][instance_id] = 1
+                    
+        except Exception as e:
+            print e
+        
+        return [image_count_dict]

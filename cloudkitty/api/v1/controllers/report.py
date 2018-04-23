@@ -40,6 +40,7 @@ class ReportController(rest.RestController):
         'update_invoice': ['PUT'],
         'show_invoice': ['GET'],
         'delete_invoice': ['DELETE'],
+        'image_count': ['GET'],
     }
 
     @wsme_pecan.wsexpose([wtypes.text],
@@ -299,3 +300,17 @@ class ReportController(rest.RestController):
 
                 # invoice details
                 invoice = storage.delete_invoice(invoice_id)
+                
+    @wsme_pecan.wsexpose([wtypes.text], wtypes.text, wtypes.text)
+    def image_count(self, begin=None, end=None):
+        """
+            function to get image used for a time period
+        """
+        
+        policy.enforce(pecan.request.context, 'report:image_count', {})
+        dt_format = '%Y-%m-%d %H:%M:%S'
+        begin_date = datetime.datetime.strptime(begin + " 00:00:00", dt_format)
+        end_date = datetime.datetime.strptime(end + " 23:59:59", dt_format)
+        storage = pecan.request.storage_backend
+        data_list = storage.get_image_usage_count(begin_date, end_date)
+        return data_list
