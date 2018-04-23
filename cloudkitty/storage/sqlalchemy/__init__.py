@@ -452,7 +452,12 @@ class SQLAlchemyStorage(storage.BaseStorage):
             for usage in result_list:
                 
                 usage_date = str(usage['begin'].date())
-                usage_resource_desc = ast.literal_eval(usage['desc'])
+                
+                try:
+                    usage_resource_desc = ast.literal_eval(usage['desc'])
+                except Exception as e:
+                    print e
+                    usage_resource_desc = {}
             
                 # check whether data frames contains instance id
                 if usage_resource_desc.has_key('instance_id'):
