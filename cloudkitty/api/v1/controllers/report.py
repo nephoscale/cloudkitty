@@ -154,7 +154,7 @@ class ReportController(rest.RestController):
         tenant_name = pecan.request.context.__dict__['tenant']
 
         # for admin tenant
-        if 'admin' in roles:
+        if 'admin' in roles or 'billing-admin' in roles:
                 invoice = storage.list_invoice(tenant_name, all_tenants)
 
         # For producing result for non-admin tenant if all-tenants arg not used
