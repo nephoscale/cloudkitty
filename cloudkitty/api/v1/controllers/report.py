@@ -108,7 +108,7 @@ class ReportController(rest.RestController):
         if tenant_id or invoice_id or payment_status or tenant_name:
 
                 # if admin role
-                if 'admin' in roles:
+                if 'admin' in roles or 'billing-admin' in roles:
 
 			# added facility for fetch using tenant name from user input also
                         invoice = storage.get_invoice(tenant_id, tenant, invoice_id, payment_status)
@@ -188,7 +188,7 @@ class ReportController(rest.RestController):
         tenant_name = pecan.request.context.__dict__['tenant']
 
         # for admin tenant
-        if 'admin' in roles:
+        if 'admin' in roles or 'billing-admin' in roles:
                 invoice = storage.show_invoice(invoice_id)
 
         # For producing result for non-admin tenant
