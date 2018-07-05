@@ -213,9 +213,9 @@ class CeilometerCollector(collector.BaseCollector):
                     break
                 
         except Exception as e:
-            LOG.warning('Error while collecting image id from instance %(instance_id)s: %(error)s', {'instance_id': str(instance_id), 'error': e})
+            LOG.warning('Error while collecting image id from instance ' + str(instance_id) + ' error: ' + str(e))
 
-        LOG.info('Image id of instance  %(instance_id)s: %(image_id)s', {'instance_id': str(instance_id), 'error': str(image_id)})
+        LOG.info('Image id of instance ' + str(instance_id) + ' is ' + str(image_id))
         return image_id
 
     def get_compute(self, start, end=None, project_id=None, q_filter=None):
