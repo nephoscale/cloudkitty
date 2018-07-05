@@ -20,6 +20,7 @@ from novaclient import client as nova_client
 from cinderclient import client as cinder_client
 from keystoneauth1 import loading as ks_loading
 from oslo_config import cfg
+from oslo_log import log as logging
 from keystoneauth1.identity import v3
 from keystoneauth1 import session
 import ConfigParser
@@ -35,7 +36,7 @@ ks_loading.register_auth_conf_options(
     cfg.CONF,
     CEILOMETER_COLLECTOR_OPTS)
 CONF = cfg.CONF
-
+LOG = logging.getLogger(__name__)
 
 class ResourceNotFound(Exception):
     """Raised when the resource doesn't exist."""
@@ -194,6 +195,7 @@ class CeilometerCollector(collector.BaseCollector):
         """
 
         image_id = None
+        LOG.info('Finding image id of instance %s.', str(instance_id))
         
         try:
             
@@ -211,9 +213,9 @@ class CeilometerCollector(collector.BaseCollector):
                     break
                 
         except Exception as e:
-            print e
-            print "Error: Instance details could not retrieved - " + str(instance_id)
+            LOG.warning('Error while collecting image id from instance %(instance_id)s: %(error)s', {'instance_id': text(instance_id), 'error': e})
 
+        LOG.info('Image id of instance  %(instance_id)s: %(image_id)s', {'instance_id': text(instance_id), 'error': str(image_id)})
         return image_id
 
     def get_compute(self, start, end=None, project_id=None, q_filter=None):
