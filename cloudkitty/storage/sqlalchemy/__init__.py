@@ -15,8 +15,12 @@
 #
 # @author: Stéphane Albert
 #
+#try: import simplejson as json
+#except ImportError: import json
 import decimal
 import json
+from collections import defaultdict
+from sqlalchemy import and_
 
 from oslo_db.sqlalchemy import utils
 import sqlalchemy
@@ -27,6 +31,11 @@ from cloudkitty.storage.sqlalchemy import migration
 from cloudkitty.storage.sqlalchemy import models
 from cloudkitty import utils as ck_utils
 
+import sqlalchemy.ext.declarative
+import sqlalchemy.orm.interfaces
+import sqlalchemy.exc
+import datetime
+import ast
 
 class DecimalJSONEncoder(json.JSONEncoder):
     """Wrapper class to handle decimal.Decimal objects in json.dumps()."""
@@ -91,12 +100,16 @@ class SQLAlchemyStorage(storage.BaseStorage):
         if r:
             return ck_utils.dt2ts(r.begin)
 
+    # Modified by Muralidharan.s for applying a logic for getting 
+    # Total value based on Instance
     def get_total(self, begin=None, end=None, tenant_id=None,
-                  service=None, groupby=None):
+                  service=None, instance_id=None, volume_type_id=None, groupby=None):
         session = db.get_session()
         querymodels = [
             sqlalchemy.func.sum(self.frame_model.rate).label('rate')
         ]
+
+        model = models.RatedDataFrame
 
         # Boundary calculation
         if not begin:
@@ -121,6 +134,15 @@ class SQLAlchemyStorage(storage.BaseStorage):
         if service:
             q = q.filter(
                 self.frame_model.res_type == service)
+        if instance_id:
+            q = q.filter(
+                self.frame_model.desc.like('%'+instance_id+'%'))
+
+        # check for volume type id
+        if volume_type_id:
+            q = q.filter(self.frame_model.desc.like('%' + volume_type_id + '%'))
+
+
         q = q.filter(
             self.frame_model.begin >= begin,
             self.frame_model.end <= end,
@@ -138,6 +160,201 @@ class SQLAlchemyStorage(storage.BaseStorage):
             total["end"] = end
             totallist.append(total)
         return totallist
+    # For listing invoice
+    # admin and non-admin tenant will be able to list the own invoice
+    # only admin tenant will be able to get the invoice of all tenant (--all-tenants)
+    def list_invoice(self, tenant_name, all_tenants=None):
+
+        model = models.InvoiceDetails
+        session = db.get_session()
+
+        # fetch the details for tenant
+        q = session.query(model).order_by(model.id).filter(model.tenant_name == tenant_name)
+
+        # Fetch the invoice for all tenants
+        if all_tenants:
+                q = session.query(model).order_by(model.id)
+
+        # Fetch all the values
+        r = q.all()
+
+        return [entry.to_cloudkitty() for entry in r]
+
+    # For getting a invoice details as needed
+    # admin tenant section
+    # can get invoice based on tenant id, tenant name, invoice id and payment status 
+    def get_invoice(self, tenant_id=None, tenant=None, invoice_id=None, payment_status=None):
+
+        model = models.InvoiceDetails
+        session = db.get_session()
+
+        # Fetch the invoice using tenant ID
+        if tenant_id:
+                q = session.query(model).order_by(model.id).filter(model.tenant_id == tenant_id)
+        # Fetch the invoices using tenant name input
+        if tenant:
+                q = session.query(model).order_by(model.id).filter(model.tenant_name == tenant)
+
+        # Fetch the invoice using invoice ID
+        if invoice_id:
+                q = session.query(model).order_by(model.id).filter(model.invoice_id == invoice_id)
+
+        # Fetch the invoice using Payment status
+        if payment_status:
+                q = session.query(model).order_by(model.id).filter(model.payment_status == payment_status)
+
+        # Fetch all the values
+        r = q.all()
+
+        return [entry.to_cloudkitty() for entry in r]
+
+    # Invoice for non-admin tenant
+    # get the invoice for non-admin tenant
+    # can be able to fetch using invoice-id and payment_status
+    def get_invoice_for_tenant(self, tenant_name, invoice_id=None, payment_status=None):
+
+        model = models.InvoiceDetails
+        session = db.get_session()
+
+        # Fetch the invoice using invoice ID
+        if invoice_id:
+                q = session.query(model).order_by(model.id).filter(and_(model.invoice_id == invoice_id, model.tenant_name == tenant_name))
+
+        # Fetch the invoice using payment_status
+        if payment_status:
+                q = session.query(model).order_by(model.id).filter(and_(model.payment_status == payment_status, model.tenant_name == tenant_name))
+        # Fetch all the values
+        r = q.all()
+
+        return [entry.to_cloudkitty() for entry in r]
+
+    # For showing a invoice details as needed
+    # admin tenant section
+    def show_invoice_for_tenant(self, tenant_name, invoice_id):
+
+        model = models.InvoiceDetails
+        session = db.get_session()
+
+        # Fetch the invoice using tenant ID
+        if invoice_id:
+                q = session.query(model).order_by(model.id).filter(and_(model.invoice_id == invoice_id, model.tenant_name == tenant_name))
+
+        # Fetch all the values
+        r = q.all()
+
+        return [entry.to_cloudkitty() for entry in r]
+
+    # For showing a invoice details as needed
+    # non-admin tenant section
+    def show_invoice(self, invoice_id):
+
+        model = models.InvoiceDetails
+        session = db.get_session()
+
+        # Fetch the invoice using tenant ID
+        if invoice_id:
+                q = session.query(model).order_by(model.id).filter(model.invoice_id == invoice_id)
+
+        # Fetch all the values
+        r = q.all()
+
+        return [entry.to_cloudkitty() for entry in r]
+
+    # add invoice to the table
+    def add_invoice(self, invoice_id, invoice_date, invoice_period_from, invoice_period_to, tenant_id, invoice_data, tenant_name, total_cost, paid_cost, balance_cost, payment_status, vat_rate, total_cost_after_vat):
+        """Create a new invoice entry.
+
+        """
+
+        session = db.get_session()
+
+        # Add invoice details
+        invoice = models.InvoiceDetails(
+                                        invoice_date = invoice_date,
+                                        invoice_period_from = invoice_period_from,
+                                        invoice_period_to = invoice_period_to,
+                                        tenant_id = tenant_id,
+                                        invoice_id = invoice_id,
+                                        invoice_data = invoice_data,
+                                        tenant_name = tenant_name,
+                                        total_cost = total_cost,
+                                        paid_cost = paid_cost,
+                                        balance_cost = balance_cost,
+                                        payment_status = payment_status,
+                                        vat_rate = vat_rate,
+                                        total_cost_after_vat = total_cost_after_vat)
+
+        try:
+            with session.begin():
+                session.add(invoice)
+
+        except sqlalchemy.exc.IntegrityError as exc:
+                reason = exc.message
+
+        return invoice
+
+    # update invoice entried in table
+    def update_invoice(self, invoice_id, total_cost, paid_cost, balance_cost, payment_status):
+        """
+        Update the invoice details
+        """
+        session = db.get_session()
+        with session.begin():
+            try:
+                q = utils.model_query(
+                    models.InvoiceDetails,
+                    session)
+                if invoice_id:
+                        q = q.filter(models.InvoiceDetails.invoice_id == invoice_id)
+                        q = q.with_lockmode('update')
+                        invoice_details = q.one()
+                        if total_cost:
+                                invoice_details.total_cost = total_cost
+                        if paid_cost:
+                                invoice_details.paid_cost = paid_cost
+                        if balance_cost:
+                                invoice_details.balance_cost = balance_cost
+                        if payment_status:
+                                invoice_details.payment_status = payment_status
+
+            except sqlalchemy.orm.exc.NoResultFound:
+                invoice_details = None
+
+        # invoice_details none
+        if invoice_details is None:
+           return invoice_details
+
+        # invoice details not none
+        # loop through invoice detail and return
+        else:
+           invoice_detail = {}
+           #return [invoice_detail for invoice_detail in invoice_details
+           if total_cost:
+                invoice_detail['total_cost'] = invoice_details.total_cost
+           if balance_cost:
+                invoice_detail['balance_cost'] = invoice_details.balance_cost
+           if paid_cost:
+                invoice_detail['paid_cost'] = invoice_details.paid_cost
+           if payment_status:
+                invoice_detail['payment_status'] = invoice_details.payment_status
+           return invoice_detail
+
+    # delete invoice entries in table
+    def delete_invoice(self, invoice_id):
+        """
+        delete the invoice details
+        """
+        session = db.get_session()
+        with session.begin():
+            try:
+                q = utils.model_query(
+                    models.InvoiceDetails,
+                    session)
+                if invoice_id:
+                    q = q.filter(models.InvoiceDetails.invoice_id == invoice_id).delete()
+
+            except sqlalchemy.orm.exc.NoResultFound:
+                invoice_deleted = None
 
     def get_tenants(self, begin, end):
         session = db.get_session()
@@ -150,6 +367,40 @@ class SQLAlchemyStorage(storage.BaseStorage):
         tenants = q.distinct().values(
             self.frame_model.tenant_id)
         return [tenant.tenant_id for tenant in tenants]
+
+
+    def add_time_frame_custom(self, **kwargs):
+        """Create a new time frame custom .
+
+        :param begin: Start of the dataframe.
+        :param end: End of the dataframe.
+        :param tenant_id: tenant_id of the dataframe owner.
+        :param unit: Unit of the metric.
+        :param qty: Quantity of the metric.
+        :param res_type: Type of the resource.
+        :param rate: Calculated rate for this dataframe.
+        :param desc: Resource description (metadata).
+        """
+
+        session = db.get_session()
+
+        # Add invoice details
+        frame = models.RatedDataFrame(
+                                        begin = kwargs.get('begin'),
+                                        end = kwargs.get('end'),
+                                        tenant_id = kwargs.get('tenant_id'),
+                                        unit = kwargs.get('unit'),
+                                        qty = kwargs.get('qty'),
+                                        res_type = kwargs.get('res_type'),
+                                        rate = decimal.Decimal(kwargs.get('rate')),
+                                        desc = json.dumps(kwargs.get('desc')))
+
+        try:
+            with session.begin():
+                session.add(frame)
+
+        except sqlalchemy.exc.IntegrityError as exc:
+                reason = exc.message
 
     def get_time_frame(self, begin, end, **filters):
         session = db.get_session()
@@ -179,7 +430,15 @@ class SQLAlchemyStorage(storage.BaseStorage):
         rate = rating_dict.get('price')
         if not rate:
             rate = decimal.Decimal(0)
-        desc = json.dumps(frame['desc'], cls=DecimalJSONEncoder)
+        # desc = json.dumps(frame['desc'], cls=DecimalJSONEncoder)
+        try:
+            desc = json.dumps(frame['desc'], cls=DecimalJSONEncoder)
+        except Exception, e:
+            print "Exception in getting description for type : ", res_type
+            print "---------------------"
+            print frame['desc']
+            print "---------------------"
+
         self.add_time_frame(begin=self.usage_start_dt.get(tenant_id),
                             end=self.usage_end_dt.get(tenant_id),
                             tenant_id=tenant_id,
@@ -203,3 +462,69 @@ class SQLAlchemyStorage(storage.BaseStorage):
         """
         frame = self.frame_model(**kwargs)
         self._session[kwargs.get('tenant_id')].add(frame)
+
+    def get_image_usage_count(self, begin, end):
+        """
+            function to get image usage
+            :param begin: Start of the dataframe.
+            :param end: End of the dataframe.
+        """
+
+        instance_id_dict = {}
+        image_count_dict = {}
+
+        try:
+            session = db.get_session()
+            q = utils.model_query(self.frame_model, session)
+            q = q.filter(
+                self.frame_model.begin >= begin,
+                self.frame_model.end <= end,
+                self.frame_model.res_type == 'compute')
+
+            result_list = q.all()
+
+            # Get the resource details and calculate the image id used
+            for usage in result_list:
+
+                usage_date = str(usage['begin'].date())
+
+                try:
+                    usage_resource_desc = ast.literal_eval(usage['desc'])
+                except Exception as e:
+                    print e
+                    usage_resource_desc = {}
+
+                # check whether data frames contains instance id
+                if usage_resource_desc.has_key('instance_id'):
+
+                    # if no key set for the respective date
+                    if not image_count_dict.has_key(usage_date):
+                        image_count_dict[usage_date] = {}
+
+                    # if no key set for the respective date
+                    if not instance_id_dict.has_key(usage_date):
+                        instance_id_dict[usage_date] = {}
+
+                    instance_id = usage_resource_desc['instance_id']
+
+                    # if instance already checked for that day, skip further execution
+                    if instance_id_dict[usage_date].has_key(instance_id):
+                        continue
+
+                    instance_image_id = usage_resource_desc.get('image_id')
+
+                    # if image id is not empty
+                    if instance_image_id and instance_image_id is not None:
+
+                        # Check for the image id key
+                        if image_count_dict[usage_date].has_key(instance_image_id):
+                            image_count_dict[usage_date][instance_image_id] += 1
+                        else:
+                            image_count_dict[usage_date][instance_image_id] = 1
+
+                        instance_id_dict[usage_date][instance_id] = 1
+
+        except Exception as e:
+            print e
+
+        return [image_count_dict]

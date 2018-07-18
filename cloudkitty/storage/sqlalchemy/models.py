@@ -15,8 +15,9 @@
 #
 # @author: Stéphane Albert
 #
-import json
-
+#import json
+try: import simplejson as json
+except ImportError: import json
 from oslo_db.sqlalchemy import models
 import sqlalchemy
 from sqlalchemy.ext import declarative
@@ -84,3 +85,60 @@ class RatedDataFrame(Base, models.ModelBase):
         ck_dict['period'] = period_dict
         ck_dict['usage'] = usage_dict
         return ck_dict
+
+
+class InvoiceDetails(Base, models.ModelBase):
+    """Invoice details table.
+    """
+    __table_args__ = {'mysql_charset': "utf8",
+                      'mysql_engine': "InnoDB"}
+    __tablename__ = 'invoice_details'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer,
+                           primary_key=True)
+    invoice_date = sqlalchemy.Column(sqlalchemy.DateTime,
+                              nullable=False)
+    invoice_period_from = sqlalchemy.Column(sqlalchemy.DateTime,
+                              nullable=False)
+    invoice_period_to = sqlalchemy.Column(sqlalchemy.DateTime,
+                              nullable=False)
+    tenant_id = sqlalchemy.Column(sqlalchemy.String(255),
+                                  nullable=False)
+    tenant_name = sqlalchemy.Column(sqlalchemy.String(255),
+                                  nullable=False)
+    invoice_id = sqlalchemy.Column(sqlalchemy.String(255),
+                             nullable=False)
+    invoice_data = sqlalchemy.Column(sqlalchemy.Text(),
+                             nullable=False)
+    total_cost = sqlalchemy.Column(sqlalchemy.Float(precision='13,2'),
+                             nullable=True)
+    total_cost_after_vat = sqlalchemy.Column(sqlalchemy.Float(precision='13,2'),
+                             nullable=True)
+    vat_rate = sqlalchemy.Column(sqlalchemy.Float(precision='13,2'),
+                             nullable=True)
+    paid_cost = sqlalchemy.Column(sqlalchemy.Float(precision='13,2'),
+                             nullable=True)
+    balance_cost = sqlalchemy.Column(sqlalchemy.Float(precision='13,2'),
+                             nullable=True)
+    payment_status = sqlalchemy.Column(sqlalchemy.Integer,
+                             nullable=True)
+
+    def to_cloudkitty(self):
+
+        invoice_dict = {}
+        invoice_dict['id'] = self.id
+        invoice_dict['invoice_date'] = ck_utils.dt2iso(self.invoice_date)
+        invoice_dict['invoice_period_from'] = ck_utils.dt2iso(self.invoice_period_from)
+        invoice_dict['invoice_period_to'] = ck_utils.dt2iso(self.invoice_period_to)
+        invoice_dict['tenant_id'] = self.tenant_id
+        invoice_dict['tenant_name'] = self.tenant_name
+        invoice_dict['invoice_id'] = self.invoice_id
+        invoice_dict['invoice_data'] = json.loads(self.invoice_data)
+        invoice_dict['total_cost'] = json.dumps(self.total_cost, use_decimal=True)
+        invoice_dict['total_cost_after_vat'] = json.dumps(self.total_cost_after_vat, use_decimal=True)
+        invoice_dict['vat_rate'] = json.dumps(self.vat_rate, use_decimal=True)
+        invoice_dict['paid_cost'] = json.dumps(self.paid_cost, use_decimal=True)
+        invoice_dict['balance_cost'] = json.dumps(self.balance_cost, use_decimal=True)
+        invoice_dict['payment_status'] = self.payment_status
+
+        return invoice_dict

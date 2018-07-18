@@ -35,6 +35,7 @@ class CeilometerTransformer(transformer.BaseTransformer):
         'name': ['display_name'],
         'availability_zone': ['availability_zone'],
         'size': ['size'],
+        'volume_type': ['volume_type'],
     }
 
     image_map = {
@@ -103,6 +104,17 @@ class CeilometerTransformer(transformer.BaseTransformer):
         res_data['user_id'] = data.user_id
         res_data['project_id'] = data.project_id
         res_data['floatingip_id'] = data.resource_id
+        return res_data
+
+    def _strip_cloudstorage(self, data):
+        res_data = self.generic_strip('cloudstorage', data)
+        res_data['resource_id'] = data.resource_id
+        res_data['project_id'] = data.project_id
+        res_data['user_id'] = data.user_id
+        res_data['metadata'] = {}
+        for field in data.metadata:
+            if field.startswith('user_metadata'):
+                res_data['metadata'][field[14:]] = data.metadata[field]
         return res_data
 
     def get_metadata(self, res_type):

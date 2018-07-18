@@ -21,6 +21,10 @@ from keystoneclient import client as kclient
 from keystoneclient import discover
 from keystoneclient import exceptions
 from oslo_config import cfg
+import ConfigParser
+from keystoneclient.v3 import client as kclient_v3
+from keystoneauth1.identity import v3
+from keystoneauth1 import session
 
 from cloudkitty import tenant_fetcher
 
