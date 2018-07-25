@@ -36,68 +36,6 @@ import sqlalchemy.exc
 import datetime
 import ast
 
-# Added for including domain filter functionality
-import ConfigParser
-from keystoneauth1 import session as ksession
-from keystoneauth1.identity import v3
-from keystoneclient.v3 import client as kclient
-
-config = ConfigParser.ConfigParser()
-config.read('/etc/cloudkitty/cloudkitty.conf')
-connection = dict(config.items('keystone_fetcher'))
-
-def get_keystone_client():
-    # Connecting to keystone
-    auth = v3.Password(
-        user_domain_id    = connection['user_domain_id'],
-        username          = connection['admin_username'],
-        password          = connection['admin_password'],
-        project_domain_id = connection['project_domain_id'],
-        project_name      = connection['admin_project_name'],
-        auth_url          = connection['auth_url']
-    )
-    # Fetching the project list under that domain
-    sess     = ksession.Session(auth=auth)
-    keystone = kclient.Client(session=sess)
-    return keystone
-
-def get_domain_project_list(domain_id):
-    # Fetch all projects under a given domain
-    project_list = [item.name for item in get_keystone_client().projects.list(domain=domain_id)]
-    return project_list
-
-def get_domain_user_role_list(domain_id, user_id):
-    # Fetch all roles assigned for a user in a domain
-    role_list = get_keystone_client().role_assignments.list(domain = domain_id, user=user_id)
-    users_roles = defaultdict(list)
-    roles_ids = []
-    if role_list:
-        for role_assignment in role_list:
-            if not hasattr(role_assignment, 'user'):
-                continue
-            user_id = role_assignment.user['id']
-            role_id = role_assignment.role['id']
-
-            # filter by domain_id
-            if ('domain' in role_assignment.scope and
-                    role_assignment.scope['domain']['id'] == domain_id):
-                users_roles[user_id].append(role_id)
-
-        for user_id in users_roles:
-            roles_ids = users_roles[user_id]
-    return roles_ids
-
-def get_role_id(role_name_to_check):
-    # Fetch the role id corresponding to a role name
-    roles = get_keystone_client().roles.list()
-    for role in roles:
-        role_name = role.name
-        if role_name == role_name_to_check:
-            role_id = role.id
-            break
-    return role_id
-
-
 class SQLAlchemyStorage(storage.BaseStorage):
     """SQLAlchemy Storage Backend
 
@@ -191,47 +129,27 @@ class SQLAlchemyStorage(storage.BaseStorage):
     # For listing invoice
     # admin and non-admin tenant will be able to list the own invoice
     # only admin tenant will be able to get the invoice of all tenant (--all-tenants)
-    def list_invoice(self, tenant_name, user_id, all_tenants=None, domain_id = None):
+    def list_invoice(self, tenant_name, all_tenants=None):
 
         model = models.InvoiceDetails
         session = db.get_session()
 
-        # Fetching the project list under that domain
-        try:
-            project_list = get_domain_project_list(domain_id)
-        except Exception as e:
-            print '============='
-            print(e)
-            print '============='
+        # fetch the details for tenant
+        q = session.query(model).order_by(model.id).filter(model.tenant_name == tenant_name)
 
-        # Fetch the roles assigned for logged in user in the current domain
-        roles_ids = get_domain_user_role_list(domain_id, user_id)
-   
-        # Fetch the role id corresponding to admin & billing-admin roles
-        domain_admin_role_id = get_role_id('admin')
-        billing_admin_role_id = get_role_id('billing-admin')
-         
-        # If user has billing-admin role for the current domain,
-        # then full invoice list will be displayed irrespective of domain.
-        # If user has admin role on the current domain, then all invoices 
-        # under each project of that domain will be displayed.
-        # For all other cases, only invoices within current project will be 
-        # displayed. 
-        if billing_admin_role_id in roles_ids and domain_id == 'default':
-            q = session.query(model).order_by(model.id)
-        elif len(roles_ids) and domain_admin_role_id in roles_ids:
-            q = session.query(model).order_by(model.id).filter(model.tenant_name.in_((project_list)))
-        else:
-            q = session.query(model).order_by(model.id).filter(model.tenant_name == tenant_name)
+        # Fetch the invoice for all tenants
+        if all_tenants:
+                q = session.query(model).order_by(model.id)
 
         # Fetch all the values
         r = q.all()
+
         return [entry.to_cloudkitty() for entry in r]
 
     # For getting a invoice details as needed
     # admin tenant section
     # can get invoice based on tenant id, tenant name, invoice id and payment status 
-    def get_invoice(self, user_id, domain_id = None, tenant_id=None, tenant=None, invoice_id=None, payment_status=None):
+    def get_invoice(self, tenant_id=None, tenant=None, invoice_id=None, payment_status=None):
 
         model = models.InvoiceDetails
         session = db.get_session()
@@ -239,6 +157,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
         # Fetch the invoice using tenant ID
         if tenant_id:
                 q = session.query(model).order_by(model.id).filter(model.tenant_id == tenant_id)
+
         # Fetch the invoices using tenant name input
         if tenant:
                 q = session.query(model).order_by(model.id).filter(model.tenant_name == tenant)
@@ -259,29 +178,17 @@ class SQLAlchemyStorage(storage.BaseStorage):
     # Invoice for non-admin tenant
     # get the invoice for non-admin tenant
     # can be able to fetch using invoice-id and payment_status
-    def get_invoice_for_tenant(self, user_id, tenant_name, domain_id = None, invoice_id=None, payment_status=None):
+    def get_invoice_for_tenant(self, tenant_name, invoice_id=None, payment_status=None):
 
         model = models.InvoiceDetails
         session = db.get_session()
 
-        # Fetch the roles assigned for logged in user in the current domain
-        roles_ids = get_domain_user_role_list(domain_id, user_id)
-
-        # Fetch the role id corresponding to admin & billing-admin roles
-        domain_admin_role_id = get_role_id('admin')
-        billing_admin_role_id = get_role_id('billing-admin')
-
-        if billing_admin_role_id in roles_ids and domain_id == 'default':
-            q = session.query(model).order_by(model.id).filter(model.invoice_id == invoice_id)
-        elif roles_ids and domain_admin_role_id in roles_ids:
-            q = session.query(model).order_by(model.id).filter(model.invoice_id == invoice_id)
-        else:
-            # Fetch the invoice using invoice ID
-            if invoice_id:
+        # Fetch the invoice using invoice ID
+        if invoice_id:
                 q = session.query(model).order_by(model.id).filter(and_(model.invoice_id == invoice_id, model.tenant_name == tenant_name))
 
-            # Fetch the invoice using payment_status
-            if payment_status:
+        # Fetch the invoice using payment_status
+        if payment_status:
                 q = session.query(model).order_by(model.id).filter(and_(model.payment_status == payment_status, model.tenant_name == tenant_name))
 
         # Fetch all the values
@@ -291,25 +198,18 @@ class SQLAlchemyStorage(storage.BaseStorage):
 
     # For showing a invoice details as needed
     # admin tenant section
-    def show_invoice_for_tenant(self, tenant_name, invoice_id, user_id, domain_id = None):
+    def show_invoice_for_tenant(self, tenant_name, invoice_id):
+
         model = models.InvoiceDetails
         session = db.get_session()
 
-        roles_ids = get_domain_user_role_list(domain_id, user_id)
-        domain_admin_role_id = get_role_id('admin')
-        billing_admin_role_id = get_role_id('billing-admin')
-
-        if billing_admin_role_id in roles_ids and domain_id == 'default':
-            q = session.query(model).order_by(model.id).filter(model.invoice_id == invoice_id)
-        elif roles_ids and domain_admin_role_id in roles_ids:
-            q = session.query(model).order_by(model.id).filter(model.invoice_id == invoice_id)
-        else:
-            # Fetch the invoice using tenant ID
-            if invoice_id:
+        # Fetch the invoice using tenant ID
+        if invoice_id:
                 q = session.query(model).order_by(model.id).filter(and_(model.invoice_id == invoice_id, model.tenant_name == tenant_name))
 
         # Fetch all the values
         r = q.all()
+
         return [entry.to_cloudkitty() for entry in r]
 
     # For showing a invoice details as needed
@@ -318,7 +218,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
 
         model = models.InvoiceDetails
         session = db.get_session()
-        
+
         # Fetch the invoice using tenant ID
         if invoice_id:
                 q = session.query(model).order_by(model.id).filter(model.invoice_id == invoice_id)
@@ -327,7 +227,6 @@ class SQLAlchemyStorage(storage.BaseStorage):
         r = q.all()
 
         return [entry.to_cloudkitty() for entry in r]
-
 
     # add invoice to the table
     def add_invoice(self, invoice_id, invoice_date, invoice_period_from, invoice_period_to, tenant_id, invoice_data, tenant_name, total_cost, paid_cost, balance_cost, payment_status, vat_rate, total_cost_after_vat):
@@ -594,3 +493,4 @@ class SQLAlchemyStorage(storage.BaseStorage):
             print e
         
         return [image_count_dict]
+

@@ -77,7 +77,6 @@ class ReportController(rest.RestController):
         total = storage.get_total(begin, end, tenant_id, service, instance_id, volume_type_id)
         return total if total else decimal.Decimal('0')
 
-
     # For getting the invoice for admin and non-admin tenants
     # Can get the invoice based on invoice-id , tenant-id, tenant-name and payment-status
     # tenant-name and tenant-id option available for admin tenants
@@ -91,10 +90,10 @@ class ReportController(rest.RestController):
 
         """
 
-        # assigning a tenant_name to another variable tenant
-        # We already have variable named tenant for making decision on type of user and actions
-        # So assigning a new name as tenant
-        tenant = tenant_name
+	# assigning a tenant_name to another variable tenant
+	# We already have variable named tenant for making decision on type of user and actions
+	# So assigning a new name as tenant
+	tenant = tenant_name
 
         policy.enforce(pecan.request.context, 'report:invoice', {})
         storage = pecan.request.storage_backend
@@ -103,33 +102,37 @@ class ReportController(rest.RestController):
         roles = pecan.request.context.__dict__['roles']
 
         # fetch tenant name
-        tenant_name = pecan.request.context.__dict__['project_name']
-
-        # Fetch the domain id and user id
-        domain_id   = pecan.request.context.__dict__['_domain_id']
-        user_id     = pecan.request.context.__dict__['_user_id']
+        tenant_name = pecan.request.context.__dict__['tenant']
 
         # If tenant_id or invoice_id or payment_status exists
         if tenant_id or invoice_id or payment_status or tenant_name:
-            # if admin role
-            if 'admin' in roles or 'billing-admin' in roles:
-                # added facility for fetch using tenant name from user input also
-                invoice = storage.get_invoice(user_id, domain_id, tenant_id, tenant, invoice_id, payment_status)
 
-            # for non-admin roles
-            else:
-                # for restricting non-admin users to use tenant-name and tenant-id options
-                if not (tenant or tenant_id):
-                    # Added facility for fetch using tenant name too
-                    invoice = storage.get_invoice_for_tenant(user_id, tenant_name, domain_id, invoice_id, payment_status)
+                # if admin role
+                if 'admin' in roles or 'billing-admin' in roles:
 
-                    # for generating a warning message if tenant_id arg passed for non-admin
+			# added facility for fetch using tenant name from user input also
+                        invoice = storage.get_invoice(tenant_id, tenant, invoice_id, payment_status)
+
+                # for non-admin roles
                 else:
-                    pecan.abort(405, six.text_type())
+
+                        # for restricting non-admin users to use tenant-name and tenant-id options
+                        if not (tenant or tenant_id):
+
+				# Added facility for fetch using tenant name too
+                                invoice = storage.get_invoice_for_tenant(tenant_name, invoice_id, payment_status)
+
+                        # for generating a warning message if tenant_id arg passed for non-admin
+                        else:
+
+                                pecan.abort(405, six.text_type())
 
         # for generating the warning message that invoice-get not supported
         else:
-            pecan.abort(405, six.text_type())
+
+                pecan.abort(405, six.text_type())
+
+
         return invoice
 
     # For invoice-list 
@@ -144,30 +147,15 @@ class ReportController(rest.RestController):
         """
         policy.enforce(pecan.request.context, 'report:list_invoice', {})
         storage = pecan.request.storage_backend
-        
         # Fetch the user role
         roles = pecan.request.context.__dict__['roles']
 
-        # Fetch tenant name, domain name, domain id and user id
-        tenant_name = pecan.request.context.__dict__['project_name']
-        domain_name = pecan.request.context.__dict__['domain_name']
-        domain_id   = pecan.request.context.__dict__['_domain_id']
-        user_id     = pecan.request.context.__dict__['_user_id']
+        # fetch tenant name
+        tenant_name = pecan.request.context.__dict__['tenant']
 
-        # For V3 condition
-        # Display error if all tenants condition has been given for a 
-        # non-admin user
-        # For all other cases, fetch the list of invoices
-        if 'admin' not in roles and all_tenants is not None:
-           pecan.abort(403, six.text_type())
-        else:
-           invoice = storage.list_invoice(tenant_name, user_id, all_tenants, domain_id)
-
-        # For V2 condition
-        '''
         # for admin tenant
         if 'admin' in roles or 'billing-admin' in roles:
-                invoice = storage.list_invoice(tenant_name, all_tenants, domain_id)
+                invoice = storage.list_invoice(tenant_name, all_tenants)
 
         # For producing result for non-admin tenant if all-tenants arg not used
         elif 'admin' not in roles and all_tenants is None:
@@ -176,7 +164,6 @@ class ReportController(rest.RestController):
         # For non-admin tenant to restrict the use of all-tenants arg
         elif 'admin' not in roles and all_tenants is not None:
                 pecan.abort(403, six.text_type())
-        '''
 
         return invoice
 
@@ -198,19 +185,15 @@ class ReportController(rest.RestController):
         roles = pecan.request.context.__dict__['roles']
 
         # fetch tenant name
-        tenant_name = pecan.request.context.__dict__['project_name']
-
-        # Fetch the domain id and user id
-        domain_id   = pecan.request.context.__dict__['_domain_id']
-        user_id     = pecan.request.context.__dict__['_user_id']
+        tenant_name = pecan.request.context.__dict__['tenant']
 
         # for admin tenant
         if 'admin' in roles or 'billing-admin' in roles:
-            invoice = storage.show_invoice(invoice_id, user_id, domain_id)
+                invoice = storage.show_invoice(invoice_id)
 
         # For producing result for non-admin tenant
         elif 'admin' not in roles:
-            invoice = storage.show_invoice_for_tenant(tenant_name, invoice_id, user_id, domain_id)
+                invoice = storage.show_invoice_for_tenant(tenant_name, invoice_id)
 
         return invoice
 
@@ -331,3 +314,4 @@ class ReportController(rest.RestController):
         storage = pecan.request.storage_backend
         data_list = storage.get_image_usage_count(begin_date, end_date)
         return data_list
+
