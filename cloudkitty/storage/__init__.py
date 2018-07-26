@@ -259,7 +259,7 @@ class BaseStorage(object):
 
     # Add invoice method
     @abc.abstractmethod
-    def add_invoice(self, invoice_id, invoice_date, invoice_period_from, invoice_period_to, tenant_id, invoice_data, tenant_name, total_cost, paid_cost, balance_cost, payment_status, vat_rate, total_cost_after_vat):
+    def add_invoice(self, invoice_id, invoice_date, invoice_period_from, invoice_period_to, tenant_id, invoice_data, tenant_name, total_cost, paid_cost, balance_cost, payment_status):
         """Add the invoice.
 
         :param invoice_id: invoice_id values
