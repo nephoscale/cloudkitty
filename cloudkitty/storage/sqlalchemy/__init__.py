@@ -118,7 +118,7 @@ def get_user_id(user_name):
 
 def get_billing_user_domain(dom_name):
     # Get the domain id of domain where billing-admin role has been asigned
-    domains = get_admin_ksclient().domains.list()
+    domains = get_keystone_client().domains.list()
     billing_user_domain = None
     for domain in domains:
         if domain.name == dom_name:
