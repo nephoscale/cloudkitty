@@ -275,8 +275,8 @@ class SQLAlchemyStorage(storage.BaseStorage):
         session = db.get_session()
 
         #Fetch the domain id and user id
-        domain_id = get_project_domain_id(tenant)
-        user_id   = get_user_id(user_name)
+        #domain_id = get_project_domain_id(tenant)
+        #user_id   = get_user_id(user_name)
 
         # Fetch the invoice using tenant ID
         if tenant_id:
