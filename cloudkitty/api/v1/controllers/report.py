@@ -111,7 +111,7 @@ class ReportController(rest.RestController):
             # if admin role
             if 'admin' in roles or 'billing-admin' in roles:
                 # added facility for fetch using tenant name from user input also
-                invoice = storage.get_invoice(tenant_id, tenant_name, user_name, invoice_id, payment_status)
+                invoice = storage.get_invoice(tenant_id, tenant, user_name, invoice_id, payment_status)
 
             # for non-admin roles
             else:
