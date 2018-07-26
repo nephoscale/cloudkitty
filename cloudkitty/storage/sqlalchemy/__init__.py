@@ -99,6 +99,7 @@ def get_role_id(role_name_to_check):
     return role_id
 
 def get_project_domain_id(project_name):
+    # Get the domain id corresponding to a project
     project_list = get_keystone_client().projects.list()
     for project in project_list:
         if project.name == project_name:
@@ -107,12 +108,23 @@ def get_project_domain_id(project_name):
     return project_domain_id
 
 def get_user_id(user_name):
+    # Get the userid corresponding to a user name
     user_details = get_keystone_client().users.list()
     for user in user_details:
         if user.name == user_name:
             user_id = user.id
             break
     return user_id
+
+def get_billing_user_domain(dom_name):
+    # Get the domain id of domain where billing-admin role has been asigned
+    domains = get_admin_ksclient().domains.list()
+    billing_user_domain = None
+    for domain in domains:
+        if domain.name == dom_name:
+            billing_user_domain = domain.id
+            break
+    return billing_user_domain
 
 
 class SQLAlchemyStorage(storage.BaseStorage):
@@ -231,6 +243,9 @@ class SQLAlchemyStorage(storage.BaseStorage):
         # Fetch the role id corresponding to admin & billing-admin roles
         domain_admin_role_id = get_role_id('admin')
         billing_admin_role_id = get_role_id('billing-admin')
+ 
+        # Fetch the id of domain to which billing-admin role has been assigned
+        billing_user_domain = get_billing_user_domain('Nephoscale')
          
         # If user has billing-admin role for the current domain,
         # then full invoice list will be displayed irrespective of domain.
@@ -239,7 +254,8 @@ class SQLAlchemyStorage(storage.BaseStorage):
         # For all other cases, only invoices within current project will be 
         # displayed. 
         #if billing_admin_role_id in roles_ids and domain_id == 'default':
-        if billing_admin_role_id in roles_ids:
+        #if billing_admin_role_id in roles_ids:
+        if billing_admin_role_id in roles_ids and domain_id == billing_user_domain:
             q = session.query(model).order_by(model.id)
         elif len(roles_ids) and domain_admin_role_id in roles_ids:
             q = session.query(model).order_by(model.id).filter(model.tenant_name.in_((project_list)))
@@ -301,7 +317,11 @@ class SQLAlchemyStorage(storage.BaseStorage):
         domain_admin_role_id = get_role_id('admin')
         billing_admin_role_id = get_role_id('billing-admin')
 
-        if billing_admin_role_id in roles_ids:
+        # Fetch the id of domain to which billing-admin role has been assigned
+        billing_user_domain = get_billing_user_domain('Nephoscale')
+
+        #if billing_admin_role_id in roles_ids:
+        if billing_admin_role_id in roles_ids and domain_id == billing_user_domain:
             q = session.query(model).order_by(model.id).filter(model.invoice_id == invoice_id)
         elif roles_ids and domain_admin_role_id in roles_ids:
             q = session.query(model).order_by(model.id).filter(model.invoice_id == invoice_id)
@@ -333,7 +353,11 @@ class SQLAlchemyStorage(storage.BaseStorage):
         domain_admin_role_id = get_role_id('admin')
         billing_admin_role_id = get_role_id('billing-admin')
 
-        if billing_admin_role_id in roles_ids:
+        # Fetch the id of domain to which billing-admin role has been assigned
+        billing_user_domain = get_billing_user_domain('Nephoscale')
+
+        #if billing_admin_role_id in roles_ids:
+        if billing_admin_role_id in roles_ids and domain_id == billing_user_domain:
             q = session.query(model).order_by(model.id).filter(model.invoice_id == invoice_id)
         elif roles_ids and domain_admin_role_id in roles_ids:
             q = session.query(model).order_by(model.id).filter(model.invoice_id == invoice_id)
