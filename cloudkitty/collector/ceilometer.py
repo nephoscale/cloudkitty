@@ -158,8 +158,18 @@ class CeilometerCollector(collector.BaseCollector):
         """Resources statistics during the timespan."""
         start_iso = ck_utils.ts2iso(start)
         req_filter = self.gen_filter(op='ge', timestamp=start_iso)
+        
+        # added for project filtering
         if project_id:
-            req_filter.extend(self.gen_filter(project=project_id))
+            
+            # Custom change by @nephoscale engineering team
+            # check in resource meta data, when meter is ip.floating
+            if meter == 'ip.floating':
+                col_data = {"resource_metadata.tenant_id" : project_id}
+                req_filter.extend(self.gen_filter(**col_data))
+            else: 
+                req_filter.extend(self.gen_filter(project=project_id))
+            
         if end:
             end_iso = ck_utils.ts2iso(end)
             req_filter.extend(self.gen_filter(op='le', timestamp=end_iso))
