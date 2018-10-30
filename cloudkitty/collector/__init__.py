@@ -45,6 +45,7 @@ collect_opts = [
                          'network.bw.out',
                          'network.floating',
                          'cloudstorage',
+                         'bandwidth',
                          'instance.addon',
                          'tenant.addon',],
                 help='Services to monitor.'), ]

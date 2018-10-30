@@ -313,6 +313,41 @@ class CeilometerCollector(collector.BaseCollector):
             raise collector.NoDataCollected(self.collector_name, 'volume')
         return self.t_cloudkitty.format_service('volume', volume_data)
 
+    def get_bandwidth(self, start, end=None, project_id=None, q_filter=None):
+        '''
+            function added to collect bandwidth usage
+            @param start: start period of  statistics
+            @param end: end period of  statistics
+            @param project_id: the id of the project
+            @param q_filter: the filter used for search in statistics
+        '''
+
+        active_bandwidth_stats = self.resources_stats(
+            'bandwidth', start, end, project_id, q_filter)
+
+        # loop through the statistics retrieved from ceilometer
+        bandwidth_data = []
+        for bandwidth_stats in active_bandwidth_stats:
+            bandwidth_id = bandwidth_stats.groupby['resource_id']
+
+            # check for resource details in cache
+            if not self._cacher.has_resource_detail('bandwidth', bandwidth_id):
+                raw_resource = self._conn.resources.get(bandwidth_id)
+                bandwidth = self.t_ceilometer.strip_resource_data('bandwidth', raw_resource)
+                raw_resource = self._conn.resources.get(bandwidth['label_id'])
+                bandwidth_details = self.t_ceilometer.strip_resource_data('bandwidth', raw_resource)
+                self._cacher.add_resource_detail('bandwidth', bandwidth_id, bandwidth_details)
+
+            bandwidth = self._cacher.get_resource_detail('bandwidth', bandwidth_id)
+            bandwidth_max_val = bandwidth_stats.max / 1048576.0
+            bandwidth_data.append(self.t_cloudkitty.format_item(bandwidth, 'MB', bandwidth_max_val))
+
+        # if no data found
+        if not bandwidth_data:
+            raise collector.NoDataCollected(self.collector_name, 'bandwidth')
+
+        return self.t_cloudkitty.format_service('bandwidth', bandwidth_data)
+
     def _get_network_bw(self,
                         direction,
                         start,
