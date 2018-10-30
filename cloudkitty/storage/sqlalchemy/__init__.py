@@ -132,6 +132,7 @@ class SQLAlchemyStorage(storage.BaseStorage):
 
     """
     frame_model = models.RatedDataFrame
+    meter_model = models.MeterLabel
 
     def __init__(self, **kwargs):
         super(SQLAlchemyStorage, self).__init__(**kwargs)
@@ -656,4 +657,115 @@ class SQLAlchemyStorage(storage.BaseStorage):
             print e
         
         return [image_count_dict]
+    
+    def get_meter_label_list(self, instance_id = None, tenant_id = None, status = None, label_id = None):
+        """
+            function to get meter label list
+            :param instance_id: The id of the instance
+            :param tenant_id: The id of the tenant
+        """
+        
+        result_list = []
+        
+        try:
+            session = db.get_session()
+            q = utils.model_query(self.meter_model, session)
+            
+            # if label id is passed
+            if label_id is not None:
+                q = q.filter(self.meter_model.label_id == label_id)
+            
+            # if instance id is passed
+            if instance_id is not None:
+                q = q.filter(self.meter_model.instance_id == instance_id)
+            
+            # if tenant id is passed    
+            if tenant_id is not None:
+                q = q.filter(self.meter_model.tenant_id == tenant_id)
+            
+            # if status is passed
+            if status is not None:
+                q = q.filter(self.meter_model.status == status)
+            
+            result_list = q.all()
+            return [entry.to_cloudkitty() for entry in result_list]
+                                
+        except Exception as e:
+            print e
+        
+        return result_list
+    
+    def create_meter_label(self, label_id, interface_id, interface_ip, instance_id, tenant_id, creation_date):
+        """
+            Create a new meter label for instance interface
+        """
+        
+        session = db.get_session()
+        meter_label = self.meter_model(
+                                       label_id = label_id,
+                                       interface_id = interface_id,
+                                       interface_ip = interface_ip,
+                                       instance_id = instance_id,
+                                       tenant_id = tenant_id,
+                                       creation_date = creation_date,
+                                       status = 1)
+        try:
+            with session.begin():
+                session.add(meter_label)
 
+        except sqlalchemy.exc.IntegrityError as exc:
+                reason = exc.message
+
+        return meter_label.to_cloudkitty()
+    
+    def update_meter_label(self, label_id, interface_id, interface_ip, status):
+        """
+            Update meter details
+        """
+        
+        meter_label = None
+        session = db.get_session()
+        with session.begin():
+            try:
+                q = utils.model_query(self.meter_model, session)
+                
+                #if label id is passed
+                if label_id:
+                    
+                    q = q.filter(self.meter_model.label_id == label_id)
+                    q = q.with_lockmode('update')
+                    meter_label = q.one()
+                    
+                    # if interface name exists
+                    if interface_id is not None:
+                            meter_label.interface_id = interface_id
+                    # if interface ip is existing
+                    if interface_ip is not None:
+                            meter_label.interface_ip = interface_ip
+                    
+                    # if status is passed
+                    if status is not None:
+                            meter_label.status = status
+
+            except sqlalchemy.orm.exc.NoResultFound:
+                meter_label = None
+                
+        return meter_label.to_cloudkitty()
+
+    def get_latest_meter_label(self):
+        """
+            function to get latest meter label
+        """
+        
+        meter_label = {}
+        
+        try:
+            session = db.get_session()
+            q = utils.model_query(self.meter_model, session).order_by(self.meter_model.id.desc()).limit(1)
+            result = q.one()
+            meter_label = result.to_cloudkitty()                                
+        except Exception as e:
+            print e
+        
+        return meter_label
+    

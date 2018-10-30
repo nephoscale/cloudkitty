@@ -140,3 +140,34 @@ class InvoiceDetails(Base, models.ModelBase):
         invoice_dict['payment_status'] = self.payment_status
 
         return invoice_dict
+    
+class MeterLabel(Base, models.ModelBase):
+    """
+        Meter label db class
+    """
+    
+    __table_args__ = {'mysql_charset': "utf8", 'mysql_engine': "InnoDB"}
+    __tablename__ = 'meter_label'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
+    label_id = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
+    interface_id = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
+    interface_ip = sqlalchemy.Column(sqlalchemy.String(100), nullable=False)
+    instance_id = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
+    tenant_id = sqlalchemy.Column(sqlalchemy.String(255), nullable=False)
+    creation_date = sqlalchemy.Column(sqlalchemy.DateTime, nullable=False)
+    status = sqlalchemy.Column(sqlalchemy.Integer, default = 1, nullable=False)
+    
+    def to_cloudkitty(self):
+
+        label_info = {}
+        label_info['id'] = self.id
+        label_info['label_id'] = self.label_id
+        label_info['interface_id'] = self.interface_id
+        label_info['interface_ip'] = self.interface_ip
+        label_info['instance_id'] = self.instance_id
+        label_info['tenant_id'] = self.tenant_id
+        label_info['creation_date'] = ck_utils.dt2iso(self.creation_date)
+        label_info['status'] = self.status
+
+        return label_info

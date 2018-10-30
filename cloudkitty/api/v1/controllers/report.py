@@ -41,6 +41,10 @@ class ReportController(rest.RestController):
         'show_invoice': ['GET'],
         'delete_invoice': ['DELETE'],
         'image_count': ['GET'],
+        'list_meter_label': ['GET'],
+        'add_meter_label': ['POST'],
+        'update_meter_label': ['PUT'],
+        'get_latest_meter_label': ['GET'],
     }
 
     @wsme_pecan.wsexpose([wtypes.text],
@@ -326,4 +330,51 @@ class ReportController(rest.RestController):
         storage = pecan.request.storage_backend
         data_list = storage.get_image_usage_count(begin_date, end_date)
         return data_list
-
+    
+    @wsme_pecan.wsexpose([wtypes.text], wtypes.text, wtypes.text, decimal.Decimal)
+    def list_meter_label(self, instance_id = None, tenant_id = None, status = None):
+        """
+            Return meter label details
+        """
+        policy.enforce(pecan.request.context, 'report:list_meter_label', {})
+        storage = pecan.request.storage_backend
+        meter_label_list = storage.get_meter_label_list(instance_id, tenant_id, status)
+        return meter_label_list
+    
+    @wsme_pecan.wsexpose([wtypes.text], wtypes.text, wtypes.text, wtypes.text, wtypes.text, wtypes.text)
+    def add_meter_label(self, label_id, interface_id, interface_ip, instance_id, tenant_id):
+        """
+            Return meter label details
+        """
+        policy.enforce(pecan.request.context, 'report:add_meter_label', {})
+        storage = pecan.request.storage_backend
+        
+        meter_label_list = storage.get_meter_label_list(instance_id, tenant_id, None, label_id)
+        
+        # if the label is already exist in the system, show error message
+        if len(meter_label_list):
+            return {"status" : False, "msg" : "Label already exists in system"}
+        
+        creation_date = datetime.datetime.now()
+        meter_label = storage.create_meter_label(label_id, interface_id, interface_ip, instance_id, tenant_id, creation_date)
+        return meter_label
+    
+    @wsme_pecan.wsexpose([wtypes.text], wtypes.text, wtypes.text, wtypes.text, wtypes.text)
+    def update_meter_label(self, label_id, interface_id = None, interface_ip = None, status = None):
+        """
+            update meter label details
+        """
+        policy.enforce(pecan.request.context, 'report:update_meter_label', {})
+        storage = pecan.request.storage_backend
+        meter_label = storage.update_meter_label(label_id, interface_id, interface_ip, status)
+        return meter_label
+    
+    @wsme_pecan.wsexpose([wtypes.text])
+    def get_latest_meter_label(self):
+        """
+            function to get latest meter label
+        """
+        policy.enforce(pecan.request.context, 'report:get_latest_meter_label', {})
+        storage = pecan.request.storage_backend
+        meter_label = storage.get_latest_meter_label()
+        return meter_label
