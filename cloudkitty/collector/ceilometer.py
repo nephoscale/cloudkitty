@@ -339,7 +339,7 @@ class CeilometerCollector(collector.BaseCollector):
                 self._cacher.add_resource_detail('bandwidth', bandwidth_id, bandwidth_details)
 
             bandwidth = self._cacher.get_resource_detail('bandwidth', bandwidth_id)
-            bandwidth_max_val = bandwidth_stats.max / 1048576.0
+            bandwidth_max_val = bandwidth_stats.sum / 1048576.0
             bandwidth_data.append(self.t_cloudkitty.format_item(bandwidth, 'MB', bandwidth_max_val))
 
         # if no data found
